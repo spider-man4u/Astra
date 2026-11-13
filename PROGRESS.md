@@ -6,7 +6,7 @@
 
 ## Phase 0 — Environment inspection
 
-**COMPLETE.** Android build environment was prepared in the OpenCode Mobile workspace. The Termux Python backend remains a separate project and has not been overwritten.
+**COMPLETE.** Android build environment was prepared in the OpenCode Mobile workspace. The Termux Python backend remains a separate project.
 
 ## Phase 1 — App foundation
 
@@ -32,44 +32,66 @@
 
 - WorkManager-backed task execution.
 - DataStore-backed task history and private notes.
-- Allowlisted read-only system status and confirmed private-note save.
-- Explicit confirmation, cancellation, 15-second execution timeout and failure reporting.
+- Allowlisted read-only status and confirmed private-note save.
+- Explicit confirmation, cancellation, 15-second timeout and failure reporting.
 - Unsupported commands rejected; arbitrary shell input is never executed.
 
 ## Phase 4 — Voice interface
 
-**IMPLEMENTED · CURRENT CI RUN VERIFYING · DEVICE VOICE TEST PENDING**
+**IMPLEMENTED · CI BUILD SUCCESSFUL · DEVICE VOICE TEST PENDING**
 
-- Tap-to-talk control on Chat.
-- Runtime `RECORD_AUDIO` permission requested only when the microphone is tapped.
-- Partial transcript preview and final recognizer result.
-- On-device recognition is preferred where Android reports it available; configured system recognizer is fallback.
-- English (India) and Hindi (India) language preference persisted in DataStore.
-- Optional automatic spoken replies and per-message speaker controls.
-- Listening is cancelled when the app backgrounds; TextToSpeech and SpeechRecognizer resources are released when Chat closes.
-- No background microphone service, wake word or audio recording archive.
+- Tap-to-talk, microphone permission and partial transcription.
+- On-device recognition preferred where available, system recognizer fallback.
+- English (India) and Hindi (India) language preference.
+- Optional spoken replies and per-message speaker controls.
+- Listening is cancelled when the app backgrounds; voice resources are released when Chat closes.
+- No wake word, always-listening mode or background recording.
 
-### Phase 4 test checklist on Redmi Pad Pro
+## Phase 5 — Termux Core bridge
 
-1. Open Chat and tap the microphone; confirm Android shows the microphone permission prompt.
-2. Grant permission and say a short English command such as “status”.
-3. Select Hindi (India) in Settings and test a short Hindi command.
-4. Confirm the recognized text creates the expected task.
-5. Enable “Speak assistant replies” and verify ASTRA reads its reply aloud.
-6. Tap the speaker control on an ASTRA message to replay it.
-7. Switch to another app while listening; confirm listening stops and no late command is submitted.
+**IMPLEMENTED · CI BUILD SUCCESSFUL · DEVICE LINK TEST PENDING**
 
-## Phase 5 — Next milestone
+### Android app
+- Fixed loopback endpoint: `127.0.0.1:8765`.
+- AES-GCM token encryption using an Android Keystore key.
+- Settings panel to save, test, disconnect and erase the bridge token.
+- Chat commands route to the Termux backend when a token is configured.
+- Configured-but-offline bridge displays an error and never falls back to mock execution.
+- Cleartext is allowed only for the loopback host; other hosts remain cleartext-disabled.
+- App version: 1.0.5 / versionCode 5.
 
-- Authenticated connection from Android app to the existing Termux Python backend.
-- Localhost bridge lifecycle, health checks, request IDs, timeouts and clear offline status.
-- Keep provider API keys in Termux, not in the APK.
-- Continue routing future device actions through the task allowlist and explicit approval.
+### Termux sidecar
+- `termux/bridge_server.py` imports the installed ASTRA v2 handler and calls `handle_turn()`.
+- Binds only to `127.0.0.1`.
+- Bearer token generated locally and stored at `~/.config/astra/bridge.token` with owner-only permissions.
+- Authenticated `GET /v1/health` and `POST /v1/command` endpoints.
+- Request size validation, loopback peer/Host check, request ID replay cache and serialised command execution.
+- ASTRA v2 popup-confirmation mode is enabled before the backend is imported.
+- `install_bridge.sh` copies only the sidecar into `~/astra/`; it does not overwrite `astra.py`, `hands.py`, `.env` or the SQLite database.
+- Bridge refuses to start if the installed assistant does not expose the required ASTRA v2 handler API.
+
+### CI coverage
+- Python bridge unit tests: health auth, invalid token, command forwarding, duplicate request replay and unknown route rejection.
+- Android unit tests: existing voice language tests.
+- Debug APK build and artifact upload.
+- CI does not prove the physical Termux process is running or that the tablet has accepted the token; the actual connection must be tested on the Redmi Pad Pro.
+
+### Phase 5 device checklist
+
+1. Confirm ASTRA v2 is installed at `~/astra` and fresh provider keys are in its private `.env`.
+2. Install the sidecar using `termux/install_bridge.sh`.
+3. Start `python ~/astra/bridge_server.py` and copy its generated access token.
+4. Save the token in ASTRA → Settings → Termux Core Link.
+5. Tap Test Link; confirm it reports Connected.
+6. Send `/status` then a normal natural-language prompt from Chat.
+7. Test a risky backend action and confirm the Termux:API permission dialog appears.
+8. Stop the Termux server and verify the Android app reports offline instead of using mock mode.
 
 ## Security rules
 
-- Do not overwrite the Termux backend during Android app development.
-- Do not hardcode provider credentials in source or APK.
-- Never interpret raw user text as shell commands.
-- Do not claim queued work has completed before the task store reports completion.
-- Microphone capture must remain user-initiated and visible.
+- Never upload `~/astra/.env` or share provider keys.
+- Revoke and rotate any provider keys found in older source copies with hard-coded credentials.
+- Never add an arbitrary shell endpoint to the bridge.
+- Do not bypass ASTRA v2's existing confirmation callbacks.
+- Keep the bridge bound to loopback; never expose it to LAN.
+- Do not overwrite the existing Termux backend or database during bridge installation.
