@@ -127,8 +127,8 @@ class AstraOverlayService : Service() {
             WindowManager.LayoutParams.TYPE_PHONE
         }
 
-        val width = if (expand) dp(252) else dp(68)
-        val height = if (expand) WindowManager.LayoutParams.WRAP_CONTENT else dp(68)
+        val width = if (expand) dp(252) else dp(92)
+        val height = if (expand) WindowManager.LayoutParams.WRAP_CONTENT else dp(92)
         val params = WindowManager.LayoutParams(
             width,
             height,
@@ -260,8 +260,8 @@ class AstraOverlayService : Service() {
                 if (isDragging) {
                     val screenWidth = resources.displayMetrics.widthPixels
                     val screenHeight = resources.displayMetrics.heightPixels
-                    val viewWidth = overlayView?.width?.takeIf { it > 0 } ?: dp(if (expanded) 252 else 68)
-                    val viewHeight = overlayView?.height?.takeIf { it > 0 } ?: dp(if (expanded) 280 else 68)
+                    val viewWidth = overlayView?.width?.takeIf { it > 0 } ?: dp(if (expanded) 252 else 92)
+                    val viewHeight = overlayView?.height?.takeIf { it > 0 } ?: dp(if (expanded) 280 else 92)
                     params.x = (initialWindowX + dx.toInt()).coerceIn(0, (screenWidth - viewWidth).coerceAtLeast(0))
                     params.y = (initialWindowY + dy.toInt()).coerceIn(0, (screenHeight - viewHeight).coerceAtLeast(0))
                     runCatching { windowManager.updateViewLayout(overlayView, params) }
@@ -382,13 +382,13 @@ class AstraOverlayService : Service() {
             super.onDraw(canvas)
             val cx = width / 2f
             val cy = height / 2f
-            val radius = minOf(width, height) * 0.40f
+            val radius = minOf(width, height) * 0.30f
 
             paint.style = Paint.Style.FILL
             paint.shader = RadialGradient(
                 cx,
                 cy,
-                radius * 1.85f,
+                radius * 1.45f,
                 intArrayOf(0x6654E8FF, 0x2220D9F4, 0x003B82F6),
                 null,
                 Shader.TileMode.CLAMP

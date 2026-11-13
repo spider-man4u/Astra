@@ -11,7 +11,7 @@ import com.spider.astra.navigation.AstraNavHost
 import com.spider.astra.ui.theme.AstraTheme
 
 class MainActivity : ComponentActivity() {
-    private val repository by lazy { MockAssistantRepository() }
+    private val repository by lazy { MockAssistantRepository(applicationContext) }
     private val settings by lazy { AstraSettings.create(applicationContext) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
