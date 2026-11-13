@@ -5,6 +5,8 @@ import com.spider.astra.assistant.models.AssistantMessage
 import com.spider.astra.assistant.models.AssistantResponse
 import com.spider.astra.assistant.state.AssistantTask
 import com.spider.astra.assistant.state.TaskStatus
+import com.spider.astra.bridge.BridgeTokenStore
+import com.spider.astra.bridge.TermuxBridgeClient
 import com.spider.astra.data.tasks.AssistantTaskStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -16,13 +18,23 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
-/** Local repository. Only ActionPlanner's registered operations can be scheduled. */
-class MockAssistantRepository(context: Context) : AssistantRepository {
+/**
+ * Hybrid ASTRA repository.
+ *
+ * If an encrypted Termux token is configured, commands are sent to the real
+ * ASTRA v2 handler. If configured but offline, they fail visibly—never fall
+ * back to the mock engine and risk silently executing a different action.
+ * Without a token, the local Phase 3 allowlisted demo remains available.
+ */
+class AstraAssistantRepository(context: Context) : AssistantRepository {
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val taskStore = AssistantTaskStore.create(appContext)
     private val orchestrator = TaskOrchestrator(appContext)
+    private val bridgeTokenStore = BridgeTokenStore(appContext)
+    private val bridgeClient = TermuxBridgeClient(bridgeTokenStore)
 
     private val _state = MutableStateFlow(AssistantState.IDLE)
     override val stateFlow: StateFlow<AssistantState> = _state.asStateFlow()
@@ -38,7 +50,7 @@ class MockAssistantRepository(context: Context) : AssistantRepository {
 
     init {
         addAssistantMessage(
-            "ASTRA task engine is online. I can run a read-only system status check or save a private note after you confirm it. Other actions remain locked until they are explicitly added to the allowlist."
+            "ASTRA is ready. Configure the Termux Core link to use your Python assistant, or leave it disconnected to use the local safe-action demo."
         )
     }
 
@@ -50,8 +62,25 @@ class MockAssistantRepository(context: Context) : AssistantRepository {
 
         return commandMutex.withLock {
             addUserMessage(trimmed)
-            _state.value = AssistantState.PLANNING
 
+            val remoteConfigured = bridgeClient.isConfigured()
+            if (remoteConfigured) {
+                _state.value = AssistantState.THINKING
+                val remote = bridgeClient.sendCommand(trimmed)
+                addAssistantMessage(
+                    remote.reply,
+                    if (remote.success) AssistantMessage.AssistantMessageState.READY
+                    else AssistantMessage.AssistantMessageState.FAILED
+                )
+                _state.value = if (remote.success) AssistantState.COMPLETED else AssistantState.ERROR
+                return@withLock AssistantResponse(
+                    success = remote.success,
+                    message = remote.reply,
+                    error = remote.error
+                )
+            }
+
+            _state.value = AssistantState.PLANNING
             if (trimmed.equals("help", ignoreCase = true) ||
                 trimmed.equals("available actions", ignoreCase = true)
             ) {
