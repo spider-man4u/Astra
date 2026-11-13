@@ -24,6 +24,8 @@ import androidx.navigation.NavHostController
 import com.spider.astra.assistant.core.AssistantRepository
 import com.spider.astra.assistant.core.AssistantState
 import com.spider.astra.assistant.models.AssistantMessage
+import com.spider.astra.assistant.state.TaskStatus
+import com.spider.astra.ui.components.TaskActionCard
 import com.spider.astra.ui.theme.AstraPalette
 import kotlinx.coroutines.launch
 
@@ -31,14 +33,17 @@ import kotlinx.coroutines.launch
 fun ChatScreen(navController: NavHostController, repository: AssistantRepository) {
     val state by repository.stateFlow.collectAsState()
     val messages by repository.messagesFlow.collectAsState()
+    val tasks by repository.tasksFlow.collectAsState()
     var command by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     val isBusy = state == AssistantState.THINKING ||
         state == AssistantState.PLANNING || state == AssistantState.EXECUTING
+    val pendingApprovals = tasks.filter { it.status == TaskStatus.AWAITING_CONFIRMATION }
 
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex)
+    LaunchedEffect(messages.size, pendingApprovals.size) {
+        val total = messages.size + pendingApprovals.size + if (pendingApprovals.isNotEmpty()) 1 else 0
+        if (total > 0) listState.animateScrollToItem(total - 1)
     }
 
     fun send() {
@@ -68,7 +73,11 @@ fun ChatScreen(navController: NavHostController, repository: AssistantRepository
                     Text("COMMS CHANNEL", color = AstraPalette.Muted, fontSize = 9.sp, letterSpacing = 1.8.sp)
                     Text("ASTRA", color = AstraPalette.Text, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                 }
-                Surface(color = AstraPalette.Panel, shape = CircleShape, border = androidx.compose.foundation.BorderStroke(1.dp, AstraPalette.Border)) {
+                Surface(
+                    color = AstraPalette.Panel,
+                    shape = CircleShape,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, AstraPalette.Border)
+                ) {
                     Row(Modifier.padding(horizontal = 10.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(6.dp).background(if (isBusy) AstraPalette.Violet else AstraPalette.Green, CircleShape))
                         Spacer(Modifier.width(7.dp))
@@ -87,7 +96,7 @@ fun ChatScreen(navController: NavHostController, repository: AssistantRepository
                         value = command,
                         onValueChange = { command = it },
                         modifier = Modifier.weight(1f),
-                        placeholder = { Text("Transmit a message…", color = AstraPalette.Dim) },
+                        placeholder = { Text("Try status, help or note: …", color = AstraPalette.Dim) },
                         singleLine = true,
                         enabled = !isBusy,
                         shape = RoundedCornerShape(18.dp),
@@ -106,7 +115,11 @@ fun ChatScreen(navController: NavHostController, repository: AssistantRepository
                         modifier = Modifier.size(48.dp).clip(CircleShape)
                             .background(if (command.isNotBlank() && !isBusy) AstraPalette.CyanBright else AstraPalette.PanelRaised)
                     ) {
-                        Icon(Icons.Filled.Send, contentDescription = "Send", tint = if (command.isNotBlank() && !isBusy) AstraPalette.BackgroundDeep else AstraPalette.Dim)
+                        Icon(
+                            Icons.Filled.Send,
+                            contentDescription = "Send",
+                            tint = if (command.isNotBlank() && !isBusy) AstraPalette.BackgroundDeep else AstraPalette.Dim
+                        )
                     }
                 }
             }
@@ -123,18 +136,37 @@ fun ChatScreen(navController: NavHostController, repository: AssistantRepository
                     Text("✦", color = AstraPalette.Cyan, fontSize = 16.sp)
                     Spacer(Modifier.width(10.dp))
                     Text(
-                        "Local simulation only · No device actions are executed",
+                        "WorkManager queue · Allowlisted actions only · Notes need confirmation",
                         color = AstraPalette.Muted,
                         fontSize = 10.sp
                     )
                 }
             }
+
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                if (pendingApprovals.isNotEmpty()) {
+                    item {
+                        Text(
+                            "PENDING APPROVALS",
+                            color = AstraPalette.Amber,
+                            fontSize = 9.sp,
+                            letterSpacing = 1.6.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    items(pendingApprovals, key = { "approval-" + it.id }) { task ->
+                        TaskActionCard(
+                            task = task,
+                            onApprove = { scope.launch { repository.approveTask(task.id) } },
+                            onCancel = { scope.launch { repository.cancelTask(task.id) } }
+                        )
+                    }
+                }
                 items(messages, key = { it.id }) { message -> MessageBubble(message) }
             }
         }

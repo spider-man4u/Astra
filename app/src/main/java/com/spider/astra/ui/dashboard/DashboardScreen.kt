@@ -2,11 +2,9 @@ package com.spider.astra.ui.dashboard
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -27,27 +25,26 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import com.spider.astra.assistant.core.AssistantRepository
 import com.spider.astra.assistant.core.AssistantState
-import com.spider.astra.assistant.state.AssistantTask
 import com.spider.astra.assistant.state.TaskStatus
 import com.spider.astra.data.settings.AstraSettings
 import com.spider.astra.navigation.Screens
 import com.spider.astra.ui.components.AstraOrb
+import com.spider.astra.ui.components.TaskActionCard
 import com.spider.astra.ui.theme.AstraPalette
 import kotlinx.coroutines.launch
 
 @Composable
-fun DashboardScreen(
-    navController: NavHostController,
-    repository: AssistantRepository,
-    settings: AstraSettings
-) {
+fun DashboardScreen(navController: NavHostController, repository: AssistantRepository, settings: AstraSettings) {
     val state by repository.stateFlow.collectAsState()
     val userName by settings.userName.collectAsState(initial = null)
     val tasks by repository.tasksFlow.collectAsState()
     var command by remember { mutableStateOf("") }
+    var showNoteDialog by remember { mutableStateOf(false) }
+    var noteDraft by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     val isBusy = state == AssistantState.THINKING ||
         state == AssistantState.PLANNING || state == AssistantState.EXECUTING
+    val awaitingCount = tasks.count { it.status == TaskStatus.AWAITING_CONFIRMATION }
 
     fun submitCommand(raw: String) {
         val clean = raw.trim()
@@ -56,41 +53,31 @@ fun DashboardScreen(
 
     Box(
         modifier = Modifier.fillMaxSize().background(
-            Brush.verticalGradient(
-                listOf(AstraPalette.Background, Color(0xFF071426), AstraPalette.BackgroundDeep)
-            )
+            Brush.verticalGradient(listOf(AstraPalette.Background, Color(0xFF071426), AstraPalette.BackgroundDeep))
         )
     ) {
-        // Atmospheric cyan light behind the system core.
         androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+            val center = androidx.compose.ui.geometry.Offset(size.width * 0.5f, size.height * 0.27f)
             drawCircle(
                 brush = Brush.radialGradient(
                     listOf(Color(0x3321D9F4), Color(0x10258BFF), Color.Transparent),
-                    center = androidx.compose.ui.geometry.Offset(size.width * 0.5f, size.height * 0.27f),
+                    center = center,
                     radius = size.width * 0.72f
                 ),
                 radius = size.width * 0.72f,
-                center = androidx.compose.ui.geometry.Offset(size.width * 0.5f, size.height * 0.27f)
+                center = center
             )
         }
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = 22.dp,
-                end = 22.dp,
-                top = 16.dp,
-                bottom = 34.dp
-            ),
+            contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 16.dp, bottom = 34.dp),
             verticalArrangement = Arrangement.spacedBy(22.dp)
         ) {
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Box(
-                        modifier = Modifier.size(42.dp).clip(RoundedCornerShape(14.dp))
+                        Modifier.size(42.dp).clip(RoundedCornerShape(14.dp))
                             .background(Brush.linearGradient(listOf(AstraPalette.Cyan, AstraPalette.Blue))),
                         contentAlignment = Alignment.Center
                     ) {
@@ -106,13 +93,10 @@ fun DashboardScreen(
                         shape = CircleShape,
                         border = androidx.compose.foundation.BorderStroke(1.dp, AstraPalette.Border)
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                        Row(Modifier.padding(horizontal = 10.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
                             Box(Modifier.size(6.dp).background(AstraPalette.Green, CircleShape))
                             Spacer(Modifier.width(6.dp))
-                            Text("DEMO MODE", color = AstraPalette.Muted, fontSize = 9.sp, letterSpacing = 1.sp)
+                            Text("TASK ENGINE", color = AstraPalette.Muted, fontSize = 9.sp, letterSpacing = 1.sp)
                         }
                     }
                     Spacer(Modifier.width(6.dp))
@@ -136,14 +120,7 @@ fun DashboardScreen(
                         letterSpacing = 2.sp,
                         fontWeight = FontWeight.SemiBold
                     )
-                    Text(
-                        "What shall we\nmake happen?",
-                        color = AstraPalette.Text,
-                        fontSize = 30.sp,
-                        lineHeight = 34.sp,
-                        fontWeight = FontWeight.Light,
-                        letterSpacing = (-0.7).sp
-                    )
+                    Text("What shall we\nmake happen?", color = AstraPalette.Text, fontSize = 30.sp, lineHeight = 34.sp, fontWeight = FontWeight.Light, letterSpacing = (-0.7).sp)
                 }
             }
 
@@ -151,11 +128,7 @@ fun DashboardScreen(
                 Box(
                     modifier = Modifier.fillMaxWidth().height(344.dp)
                         .clip(RoundedCornerShape(30.dp))
-                        .background(
-                            Brush.linearGradient(
-                                listOf(Color(0xFF102A43), Color(0xFF0A1A2D), Color(0xFF091323))
-                            )
-                        )
+                        .background(Brush.linearGradient(listOf(Color(0xFF102A43), Color(0xFF0A1A2D), Color(0xFF091323))))
                         .border(
                             1.dp,
                             Brush.linearGradient(listOf(Color(0x6654E8FF), Color(0x222C5F8C), Color(0x443F68A1))),
@@ -179,39 +152,21 @@ fun DashboardScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(
-                            "SYSTEM CORE  /  ASTRA-01",
-                            color = AstraPalette.Muted,
-                            fontSize = 9.sp,
-                            letterSpacing = 2.3.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                        AstraOrb(
-                            state = state,
-                            modifier = Modifier.size(224.dp),
-                            size = 224.dp,
-                            glowEnabled = true
-                        )
+                        Text("SYSTEM CORE  /  ASTRA-01", color = AstraPalette.Muted, fontSize = 9.sp, letterSpacing = 2.3.sp)
+                        AstraOrb(state = state, modifier = Modifier.size(224.dp), size = 224.dp, glowEnabled = true)
                         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Surface(
                                 color = stateColor(state).copy(alpha = 0.12f),
                                 shape = CircleShape,
                                 border = androidx.compose.foundation.BorderStroke(1.dp, stateColor(state).copy(alpha = 0.35f))
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 13.dp, vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
+                                Row(Modifier.padding(horizontal = 13.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Box(Modifier.size(6.dp).background(stateColor(state), CircleShape))
                                     Spacer(Modifier.width(8.dp))
                                     Text(stateLabel(state).uppercase(), color = stateColor(state), fontSize = 10.sp, letterSpacing = 1.4.sp)
                                 }
                             }
-                            Text(
-                                if (isBusy) "Processing your request" else "Awaiting your command",
-                                color = AstraPalette.Muted,
-                                fontSize = 11.sp
-                            )
+                            Text(if (isBusy) "Processing your request" else "Awaiting your command", color = AstraPalette.Muted, fontSize = 11.sp)
                         }
                     }
                 }
@@ -221,7 +176,7 @@ fun DashboardScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                         Text("COMMAND LINK", color = AstraPalette.Muted, fontSize = 10.sp, letterSpacing = 2.sp, fontWeight = FontWeight.SemiBold)
-                        Text("SECURE LOCAL UI", color = AstraPalette.Dim, fontSize = 9.sp, letterSpacing = 1.sp)
+                        Text("ALLOWLISTED ACTIONS", color = AstraPalette.Dim, fontSize = 9.sp, letterSpacing = 1.sp)
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp))
@@ -236,7 +191,7 @@ fun DashboardScreen(
                             value = command,
                             onValueChange = { command = it },
                             modifier = Modifier.weight(1f),
-                            placeholder = { Text("Enter a command…", color = AstraPalette.Dim) },
+                            placeholder = { Text("Try “status” or “help”…", color = AstraPalette.Dim) },
                             singleLine = true,
                             enabled = !isBusy,
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
@@ -258,13 +213,14 @@ fun DashboardScreen(
                         )
                         Spacer(Modifier.width(6.dp))
                         IconButton(
-                            onClick = {
-                                submitCommand(command)
-                                command = ""
-                            },
+                            onClick = { submitCommand(command); command = "" },
                             enabled = command.isNotBlank() && !isBusy,
                             modifier = Modifier.size(44.dp).clip(CircleShape)
-                                .background(if (command.isNotBlank() && !isBusy) Brush.linearGradient(listOf(AstraPalette.Cyan, AstraPalette.Blue)) else Brush.linearGradient(listOf(AstraPalette.PanelRaised, AstraPalette.PanelRaised)))
+                                .background(
+                                    if (command.isNotBlank() && !isBusy)
+                                        Brush.linearGradient(listOf(AstraPalette.Cyan, AstraPalette.Blue))
+                                    else Brush.linearGradient(listOf(AstraPalette.PanelRaised, AstraPalette.PanelRaised))
+                                )
                         ) {
                             Text("↑", color = if (command.isNotBlank() && !isBusy) AstraPalette.BackgroundDeep else AstraPalette.Dim, fontSize = 23.sp, fontWeight = FontWeight.Bold)
                         }
@@ -276,14 +232,17 @@ fun DashboardScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                         Text("QUICK ACCESS", color = AstraPalette.Muted, fontSize = 10.sp, letterSpacing = 2.sp, fontWeight = FontWeight.SemiBold)
-                        Text("01 — 04", color = AstraPalette.Dim, fontSize = 9.sp, letterSpacing = 1.sp)
+                        Text("SAFE ACTIONS", color = AstraPalette.Dim, fontSize = 9.sp, letterSpacing = 1.sp)
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                        ActionTile("System scan", "Check core status", "⌁", Modifier.weight(1f)) { submitCommand("Show ASTRA status") }
-                        ActionTile("Daily plan", "Organise my day", "◷", Modifier.weight(1f)) { submitCommand("Help me plan my day") }
+                        ActionTile("System scan", "Read-only status", "⌁", Modifier.weight(1f)) { submitCommand("Show ASTRA status") }
+                        ActionTile("Create note", "Needs your approval", "✎", Modifier.weight(1f)) {
+                            noteDraft = ""
+                            showNoteDialog = true
+                        }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                        ActionTile("Focus mode", "Start a 25 min focus", "◎", Modifier.weight(1f)) { submitCommand("Help me focus for 25 minutes") }
+                        ActionTile("Available actions", "Show safe commands", "⌘", Modifier.weight(1f)) { submitCommand("help") }
                         ActionTile("Conversations", "Open assistant chat", "✧", Modifier.weight(1f)) { navController.navigate(Screens.CHAT) }
                     }
                 }
@@ -293,7 +252,11 @@ fun DashboardScreen(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         Text("ACTIVITY LOG", color = AstraPalette.Muted, fontSize = 10.sp, letterSpacing = 2.sp, fontWeight = FontWeight.SemiBold)
-                        Text("Your recent operations", color = AstraPalette.Dim, fontSize = 11.sp)
+                        Text(
+                            if (awaitingCount > 0) "$awaitingCount task(s) need your approval" else "Persistent task history",
+                            color = if (awaitingCount > 0) AstraPalette.Amber else AstraPalette.Dim,
+                            fontSize = 11.sp
+                        )
                     }
                     TextButton(onClick = { navController.navigate(Screens.CHAT) }) {
                         Text("VIEW ALL  ↗", color = AstraPalette.Cyan, fontSize = 10.sp, letterSpacing = 1.sp)
@@ -320,12 +283,18 @@ fun DashboardScreen(
                     }
                 }
             } else {
-                items(tasks.take(4), key = { it.id }) { task -> TaskRow(task) }
+                items(tasks.take(5), key = { it.id }) { task ->
+                    TaskActionCard(
+                        task = task,
+                        onApprove = { scope.launch { repository.approveTask(task.id) } },
+                        onCancel = { scope.launch { repository.cancelTask(task.id) } }
+                    )
+                }
             }
 
             item {
                 Text(
-                    "ASTRA PREVIEW BUILD  ·  SIMULATED RESPONSES ONLY",
+                    "PHASE 3  ·  PERSISTENT TASKS  ·  SAFE ACTION REGISTRY",
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                     color = AstraPalette.Dim,
                     fontSize = 9.sp,
@@ -333,11 +302,56 @@ fun DashboardScreen(
                 )
             }
         }
+
+        if (showNoteDialog) {
+            AlertDialog(
+                onDismissRequest = { showNoteDialog = false },
+                containerColor = AstraPalette.Panel,
+                title = { Text("Create a private note", color = AstraPalette.Text) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            "ASTRA will save this note only after you explicitly confirm its task card.",
+                            color = AstraPalette.Muted,
+                            fontSize = 11.sp
+                        )
+                        OutlinedTextField(
+                            value = noteDraft,
+                            onValueChange = { if (it.length <= 500) noteDraft = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = { Text("Write your note…") },
+                            minLines = 2,
+                            maxLines = 4
+                        )
+                        Text(noteDraft.length.toString() + "/500", color = AstraPalette.Dim, fontSize = 10.sp)
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            val note = noteDraft.trim()
+                            showNoteDialog = false
+                            if (note.isNotEmpty()) scope.launch { repository.sendCommand("note: " + note) }
+                        },
+                        enabled = noteDraft.trim().isNotEmpty()
+                    ) { Text("CREATE REQUEST", color = AstraPalette.Cyan) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showNoteDialog = false }) { Text("CANCEL", color = AstraPalette.Muted) }
+                }
+            )
+        }
     }
 }
 
 @Composable
-private fun ActionTile(title: String, subtitle: String, glyph: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun ActionTile(
+    title: String,
+    subtitle: String,
+    glyph: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
     Surface(
         onClick = onClick,
         modifier = modifier.height(96.dp),
@@ -355,33 +369,6 @@ private fun ActionTile(title: String, subtitle: String, glyph: String, modifier:
     }
 }
 
-@Composable
-private fun TaskRow(task: AssistantTask) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = AstraPalette.Panel,
-        shape = RoundedCornerShape(18.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, AstraPalette.Border)
-    ) {
-        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(34.dp).clip(CircleShape).background(AstraPalette.PanelRaised), contentAlignment = Alignment.Center) {
-                Text("⌘", color = AstraPalette.Cyan, fontSize = 17.sp)
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(task.command, color = AstraPalette.Text, maxLines = 1, fontSize = 12.sp)
-                Text(task.result ?: task.error ?: "Demo operation", color = AstraPalette.Muted, maxLines = 1, fontSize = 10.sp)
-            }
-            Text(
-                task.status.name.lowercase().replace('_', ' '),
-                color = taskColor(task.status),
-                fontSize = 9.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
-    }
-}
-
 private fun stateLabel(state: AssistantState): String =
     state.name.lowercase().replace('_', ' ').replaceFirstChar { it.uppercase() }
 
@@ -392,11 +379,4 @@ private fun stateColor(state: AssistantState): Color = when (state) {
     AssistantState.EXECUTING, AssistantState.WAITING_FOR_PERMISSION -> AstraPalette.Amber
     AssistantState.COMPLETED -> AstraPalette.Green
     AssistantState.ERROR -> AstraPalette.Red
-}
-
-private fun taskColor(status: TaskStatus): Color = when (status) {
-    TaskStatus.COMPLETED -> AstraPalette.Green
-    TaskStatus.FAILED -> AstraPalette.Red
-    TaskStatus.EXECUTING, TaskStatus.PLANNING -> AstraPalette.Cyan
-    else -> AstraPalette.Muted
 }
