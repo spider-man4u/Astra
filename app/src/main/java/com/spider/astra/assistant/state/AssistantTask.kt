@@ -1,28 +1,21 @@
 package com.spider.astra.assistant.state
 
-/**
- * The lifecycle states of a task handled by ASTRA.
- */
 enum class TaskStatus {
-    IDLE,
-    PENDING,
-    PLANNING,
-    EXECUTING,
-    WAITING_FOR_PERMISSION,
-    COMPLETED,
-    FAILED,
-    CANCELLED
+    IDLE, PENDING, AWAITING_CONFIRMATION, PLANNING, EXECUTING,
+    WAITING_FOR_PERMISSION, COMPLETED, FAILED, CANCELLED
 }
 
-/**
- * A lightweight, persistent task record.
- */
+/** Durable task description. Command text is never interpreted as executable code. */
 data class AssistantTask(
     val id: String = java.util.UUID.randomUUID().toString(),
     val command: String,
-    var status: TaskStatus = TaskStatus.PENDING,
-    val createdAt: Long = java.lang.System.currentTimeMillis(),
-    var updatedAt: Long = java.lang.System.currentTimeMillis(),
-    var result: String? = null,
-    var error: String? = null
+    val status: TaskStatus = TaskStatus.PENDING,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis(),
+    val result: String? = null,
+    val error: String? = null,
+    val actionKey: String? = null,
+    val payload: String? = null,
+    val requiresConfirmation: Boolean = false,
+    val confirmed: Boolean = false
 )
