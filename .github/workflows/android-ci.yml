@@ -53,6 +53,9 @@ jobs:
       - name: Install Android SDK components
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
+      - name: Run Termux bridge tests
+        run: python3 -m unittest discover -s termux/tests -v
+
       - name: Run unit tests
         run: ./gradlew --no-daemon :app:testDebugUnitTest
 

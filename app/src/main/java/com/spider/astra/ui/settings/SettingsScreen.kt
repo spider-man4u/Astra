@@ -10,6 +10,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,6 +25,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
@@ -32,10 +35,14 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavHostController
+import com.spider.astra.bridge.BridgeTokenStore
+import com.spider.astra.bridge.TermuxBridgeClient
 import com.spider.astra.data.settings.AstraSettings
 import com.spider.astra.services.overlay.AstraOverlayService
 import com.spider.astra.ui.theme.AstraPalette
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun SettingsScreen(navController: NavHostController, settings: AstraSettings) {
@@ -50,6 +57,21 @@ fun SettingsScreen(navController: NavHostController, settings: AstraSettings) {
     var serviceRunning by remember { mutableStateOf(AstraOverlayService.isRunning) }
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    val bridgeTokenStore = remember(context) { BridgeTokenStore(context) }
+    val bridgeClient = remember(bridgeTokenStore) { TermuxBridgeClient(bridgeTokenStore) }
+    var bridgeTokenInput by remember { mutableStateOf("") }
+    var bridgeConfigured by remember { mutableStateOf(false) }
+    var bridgeBusy by remember { mutableStateOf(false) }
+    var bridgeStatus by remember { mutableStateOf("Checking saved connection…") }
+
+    LaunchedEffect(Unit) {
+        bridgeConfigured = withContext(Dispatchers.IO) { bridgeTokenStore.hasToken() }
+        bridgeStatus = if (bridgeConfigured) {
+            "Token is saved. Test the connection to check whether Termux is running."
+        } else {
+            "Not configured · ASTRA is using its local safe-action engine."
+        }
+    }
 
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -307,6 +329,116 @@ fun SettingsScreen(navController: NavHostController, settings: AstraSettings) {
                     )
                 }
 
+                SettingsPanel(title = "TERMUX CORE LINK", subtitle = "Connect ASTRA to your Python brain on this device") {
+                    Text("LOCAL ENDPOINT", color = AstraPalette.Muted, fontSize = 9.sp, letterSpacing = 1.4.sp)
+                    Text(
+                        "http://127.0.0.1:8765",
+                        color = AstraPalette.Cyan,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        "Start bridge_server.py in Termux, then paste its access token here. The token is encrypted with Android Keystore.",
+                        color = AstraPalette.Muted,
+                        fontSize = 11.sp,
+                        lineHeight = 16.sp
+                    )
+                    OutlinedTextField(
+                        value = bridgeTokenInput,
+                        onValueChange = { if (it.length <= 256) bridgeTokenInput = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("Termux bridge access token") },
+                        placeholder = { Text("Paste token from Termux") },
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = AstraPalette.Cyan,
+                            unfocusedBorderColor = AstraPalette.Border,
+                            focusedTextColor = AstraPalette.Text,
+                            unfocusedTextColor = AstraPalette.Text,
+                            cursorColor = AstraPalette.Cyan
+                        )
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        Button(
+                            onClick = {
+                                val token = bridgeTokenInput.trim()
+                                scope.launch {
+                                    bridgeBusy = true
+                                    val saved = withContext(Dispatchers.IO) {
+                                        runCatching { bridgeTokenStore.saveToken(token) }
+                                    }
+                                    if (saved.isSuccess) {
+                                        bridgeTokenInput = ""
+                                        bridgeConfigured = true
+                                        bridgeStatus = "Token saved securely. Checking Termux…"
+                                        val health = bridgeClient.checkHealth()
+                                        bridgeStatus = health.message
+                                    } else {
+                                        bridgeStatus = saved.exceptionOrNull()?.message ?: "Could not save token."
+                                    }
+                                    bridgeBusy = false
+                                }
+                            },
+                            enabled = bridgeTokenInput.trim().length >= 32 && !bridgeBusy,
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            shape = RoundedCornerShape(13.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = AstraPalette.CyanBright,
+                                contentColor = AstraPalette.BackgroundDeep
+                            )
+                        ) {
+                            Text("SAVE TOKEN", fontSize = 9.sp, letterSpacing = 1.sp, fontWeight = FontWeight.Bold)
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                scope.launch {
+                                    bridgeBusy = true
+                                    bridgeStatus = bridgeClient.checkHealth().message
+                                    bridgeBusy = false
+                                }
+                            },
+                            enabled = bridgeConfigured && !bridgeBusy,
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            shape = RoundedCornerShape(13.dp)
+                        ) {
+                            Text("TEST LINK", fontSize = 9.sp, letterSpacing = 1.sp)
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            Modifier.size(7.dp).background(
+                                if (bridgeStatus.startsWith("Connected")) AstraPalette.Green
+                                else if (bridgeConfigured) AstraPalette.Amber else AstraPalette.Dim,
+                                CircleShape
+                            )
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            bridgeStatus,
+                            color = if (bridgeStatus.startsWith("Connected")) AstraPalette.Green else AstraPalette.Muted,
+                            fontSize = 10.sp,
+                            lineHeight = 15.sp
+                        )
+                    }
+                    TextButton(
+                        onClick = {
+                            scope.launch {
+                                withContext(Dispatchers.IO) { bridgeTokenStore.clear() }
+                                bridgeConfigured = false
+                                bridgeTokenInput = ""
+                                bridgeStatus = "Token removed. Commands will use local demo mode."
+                            }
+                        },
+                        enabled = bridgeConfigured && !bridgeBusy,
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Text("DISCONNECT & ERASE TOKEN", color = AstraPalette.Red, fontSize = 9.sp, letterSpacing = 0.8.sp)
+                    }
+                }
+
                 SettingsPanel(title = "RUNTIME", subtitle = "Current assistant environment") {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(7.dp).background(AstraPalette.Amber, CircleShape))
@@ -314,7 +446,7 @@ fun SettingsScreen(navController: NavHostController, settings: AstraSettings) {
                         Text("LOCAL SIMULATION", color = AstraPalette.Amber, fontSize = 10.sp, letterSpacing = 1.3.sp, fontWeight = FontWeight.Bold)
                     }
                     Text(
-                        "ASTRA uses a local allowlisted task engine. No remote AI provider or Termux backend is connected. Voice input and speech output use Android speech services.",
+                        "When a Termux token is configured, chat commands use the existing Python assistant. Provider keys remain in Termux. Without a saved token, ASTRA uses its local safe-action demo.",
                         color = AstraPalette.Muted,
                         fontSize = 11.sp,
                         lineHeight = 17.sp
@@ -325,11 +457,11 @@ fun SettingsScreen(navController: NavHostController, settings: AstraSettings) {
                     RoadmapLine("02", "Floating orb", "Overlay and permission flow", true)
                     RoadmapLine("03", "Background tasks", "Foreground service and task handling", true)
                     RoadmapLine("04", "Voice interface", "Tap-to-talk and spoken responses", true)
-                    RoadmapLine("05", "Core intelligence", "Secure connection to your Termux backend", false)
+                    RoadmapLine("05", "Core intelligence", "Authenticated Termux backend bridge", true)
                 }
 
                 Text(
-                    "ASTRA  /  PERSONAL INTELLIGENCE  /  BUILD 04",
+                    "ASTRA  /  PERSONAL INTELLIGENCE  /  BUILD 05",
                     modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                     color = AstraPalette.Dim,
                     fontSize = 9.sp,

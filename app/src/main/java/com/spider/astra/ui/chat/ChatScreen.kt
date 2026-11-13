@@ -31,6 +31,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavHostController
 import com.spider.astra.assistant.core.AssistantRepository
+import com.spider.astra.bridge.BridgeTokenStore
 import com.spider.astra.assistant.core.AssistantState
 import com.spider.astra.assistant.models.AssistantMessage
 import com.spider.astra.assistant.state.TaskStatus
@@ -47,6 +48,7 @@ fun ChatScreen(
     settings: AstraSettings
 ) {
     val context = LocalContext.current
+    val termuxConfigured = remember(context) { BridgeTokenStore(context).hasToken() }
     val lifecycleOwner = LocalLifecycleOwner.current
     val state by repository.stateFlow.collectAsState()
     val messages by repository.messagesFlow.collectAsState()

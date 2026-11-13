@@ -1,9 +1,12 @@
 import json
+import sys
 import threading
+from pathlib import Path
 import unittest
 import urllib.error
 import urllib.request
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from bridge_server import AstraBridgeHTTPServer
 
 
