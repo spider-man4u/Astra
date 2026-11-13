@@ -1,5 +1,12 @@
 package com.spider.astra.ui.settings
 
+import android.Manifest
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings as AndroidSettings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -19,22 +26,81 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavHostController
 import com.spider.astra.data.settings.AstraSettings
+import com.spider.astra.services.overlay.AstraOverlayService
 import com.spider.astra.ui.theme.AstraPalette
 import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(navController: NavHostController, settings: AstraSettings) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val storedName by settings.userName.collectAsState(initial = null)
     val voiceEnabled by settings.voiceEnabled.collectAsState(initial = false)
     val themeMode by settings.themeMode.collectAsState(initial = "system")
     var nameInput by remember { mutableStateOf("Spider") }
+    var overlayGranted by remember { mutableStateOf(AndroidSettings.canDrawOverlays(context)) }
+    var serviceRunning by remember { mutableStateOf(AstraOverlayService.isRunning) }
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) {
+        // Notification permission is optional for starting an FGS. Android may
+        // still show the service in its active-app/task-manager surfaces.
+        AstraOverlayService.start(context)
+        serviceRunning = AstraOverlayService.isRunning
+        scope.launch {
+            snackbarHostState.showSnackbar(
+                if (it) "Floating orb started" else "Orb started; notification drawer alerts are disabled"
+            )
+        }
+    }
+
+    fun startOrb() {
+        overlayGranted = AndroidSettings.canDrawOverlays(context)
+        if (!overlayGranted) {
+            val permissionIntent = Intent(
+                AndroidSettings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:" + context.packageName)
+            )
+            context.startActivity(permissionIntent)
+            return
+        }
+
+        if (
+            Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            AstraOverlayService.start(context)
+            serviceRunning = AstraOverlayService.isRunning
+            scope.launch { snackbarHostState.showSnackbar("Floating orb started") }
+        }
+    }
+
     LaunchedEffect(storedName) {
         nameInput = storedName?.takeIf { it.isNotBlank() } ?: "Spider"
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                overlayGranted = AndroidSettings.canDrawOverlays(context)
+                serviceRunning = AstraOverlayService.isRunning
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     Box(
@@ -115,6 +181,82 @@ fun SettingsScreen(navController: NavHostController, settings: AstraSettings) {
                     }
                 }
 
+                SettingsPanel(title = "FLOATING INTERFACE", subtitle = "Keep the ASTRA orb available over other apps") {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(7.dp).background(if (overlayGranted) AstraPalette.Green else AstraPalette.Amber, CircleShape))
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            if (overlayGranted) "OVERLAY ACCESS GRANTED" else "OVERLAY ACCESS REQUIRED",
+                            color = if (overlayGranted) AstraPalette.Green else AstraPalette.Amber,
+                            fontSize = 9.sp,
+                            letterSpacing = 1.2.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Text(
+                        "ASTRA needs your explicit Android permission to draw a small floating orb above other apps. It can be moved, minimized or stopped at any time.",
+                        color = AstraPalette.Muted,
+                        fontSize = 11.sp,
+                        lineHeight = 17.sp
+                    )
+                    Button(
+                        onClick = {
+                            val intent = Intent(
+                                AndroidSettings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                Uri.parse("package:" + context.packageName)
+                            )
+                            context.startActivity(intent)
+                        },
+                        modifier = Modifier.fillMaxWidth().height(44.dp),
+                        shape = RoundedCornerShape(13.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (overlayGranted) AstraPalette.PanelRaised else AstraPalette.CyanBright,
+                            contentColor = if (overlayGranted) AstraPalette.Text else AstraPalette.BackgroundDeep
+                        )
+                    ) {
+                        Text(
+                            if (overlayGranted) "MANAGE OVERLAY PERMISSION" else "GRANT OVERLAY ACCESS",
+                            fontSize = 10.sp,
+                            letterSpacing = 1.1.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Button(
+                        onClick = {
+                            if (serviceRunning) {
+                                AstraOverlayService.stop(context)
+                                serviceRunning = false
+                                scope.launch { snackbarHostState.showSnackbar("Floating orb stopped") }
+                            } else {
+                                startOrb()
+                            }
+                        },
+                        enabled = overlayGranted || serviceRunning,
+                        modifier = Modifier.fillMaxWidth().height(46.dp),
+                        shape = RoundedCornerShape(13.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (serviceRunning) AstraPalette.Red.copy(alpha = 0.18f) else AstraPalette.CyanBright,
+                            contentColor = if (serviceRunning) AstraPalette.Red else AstraPalette.BackgroundDeep,
+                            disabledContainerColor = AstraPalette.PanelRaised,
+                            disabledContentColor = AstraPalette.Dim
+                        )
+                    ) {
+                        Text(
+                            if (serviceRunning) "STOP FLOATING ORB" else "START FLOATING ORB",
+                            fontSize = 10.sp,
+                            letterSpacing = 1.2.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Text(
+                        if (serviceRunning) "The floating interface is running. Use its × control or this button to stop it."
+                        else "The orb starts only after you grant overlay access and explicitly enable it.",
+                        color = AstraPalette.Dim,
+                        fontSize = 10.sp,
+                        lineHeight = 15.sp
+                    )
+                }
+
                 SettingsPanel(title = "APPEARANCE", subtitle = "Choose the visual atmosphere") {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                         ThemeChoice("SYSTEM", themeMode == "system" || themeMode == null, Modifier.weight(1f)) {
@@ -156,7 +298,7 @@ fun SettingsScreen(navController: NavHostController, settings: AstraSettings) {
                         Text("LOCAL SIMULATION", color = AstraPalette.Amber, fontSize = 10.sp, letterSpacing = 1.3.sp, fontWeight = FontWeight.Bold)
                     }
                     Text(
-                        "This build simulates command processing. No AI provider, Termux backend, microphone, floating overlay or device-control service is connected.",
+                        "This build simulates command processing. No AI provider, Termux backend, microphone or device-control service is connected. The floating orb is a separate interface only.",
                         color = AstraPalette.Muted,
                         fontSize = 11.sp,
                         lineHeight = 17.sp
@@ -164,14 +306,14 @@ fun SettingsScreen(navController: NavHostController, settings: AstraSettings) {
                 }
 
                 SettingsPanel(title = "ROADMAP", subtitle = "What comes after the foundation") {
-                    RoadmapLine("02", "Floating orb", "Persistent overlay and permission flow", true)
+                    RoadmapLine("02", "Floating orb", "Overlay and permission flow", true)
                     RoadmapLine("03", "Background tasks", "Foreground service and task handling", false)
                     RoadmapLine("04", "Voice interface", "Speech recognition and spoken responses", false)
                     RoadmapLine("05", "Core intelligence", "Secure connection to your Termux backend", false)
                 }
 
                 Text(
-                    "ASTRA  /  PERSONAL INTELLIGENCE  /  BUILD 01",
+                    "ASTRA  /  PERSONAL INTELLIGENCE  /  BUILD 02",
                     modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                     color = AstraPalette.Dim,
                     fontSize = 9.sp,
@@ -190,10 +332,7 @@ private fun SettingsPanel(title: String, subtitle: String, content: @Composable 
         shape = RoundedCornerShape(22.dp),
         border = androidx.compose.foundation.BorderStroke(1.dp, AstraPalette.Border)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(title, color = AstraPalette.Cyan, fontSize = 9.sp, letterSpacing = 1.8.sp, fontWeight = FontWeight.Bold)
                 Text(subtitle, color = AstraPalette.Muted, fontSize = 11.sp)

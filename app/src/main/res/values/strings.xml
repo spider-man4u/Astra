@@ -39,4 +39,5 @@
     <string name="grant_overlay">Grant overlay permission</string>
     <string name="open_settings">Open settings</string>
     <string name="permission_denied">Overlay permission denied. The bubble cannot appear until granted.</string>
+    <string name="overlay_service_description">Shows the floating ASTRA orb when explicitly enabled by the user.</string>
 </resources>
