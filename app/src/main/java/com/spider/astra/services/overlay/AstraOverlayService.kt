@@ -393,7 +393,7 @@ class AstraOverlayService : Service() {
                 null,
                 Shader.TileMode.CLAMP
             )
-            canvas.drawCircle(cx, cy, radius * 1.85f, paint)
+            canvas.drawCircle(cx, cy, radius * 1.45f, paint)
             paint.shader = null
 
             paint.style = Paint.Style.STROKE
