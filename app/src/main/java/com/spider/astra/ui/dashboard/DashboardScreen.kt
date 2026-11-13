@@ -1,10 +1,13 @@
 package com.spider.astra.ui.dashboard
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
@@ -16,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.spider.astra.assistant.core.AssistantRepository
 import com.spider.astra.assistant.core.AssistantState
+import com.spider.astra.assistant.state.AssistantTask
 import com.spider.astra.assistant.state.TaskStatus
 import com.spider.astra.data.settings.AstraSettings
 import com.spider.astra.navigation.Screens
@@ -24,56 +28,208 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardScreen(navController: NavHostController, repository: AssistantRepository, settings: AstraSettings) {
-    val state by repository.stateFlow.collectAsState(initial = AssistantState.IDLE)
-    val userName by settings.userName.collectAsState(initial = "Spider")
-    val recentTasks = repository.recentTasks(5)
+fun DashboardScreen(
+    navController: NavHostController,
+    repository: AssistantRepository,
+    settings: AstraSettings
+) {
+    val state by repository.stateFlow.collectAsState()
+    val userName by settings.userName.collectAsState(initial = null)
+    val tasks by repository.tasksFlow.collectAsState()
     var command by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
-    Scaffold(topBar = {
-        TopAppBar(title = { Text("ASTRA") }, actions = {
-            IconButton(onClick = { navController.navigate(Screens.SETTINGS) }) {
-                Icon(Icons.Filled.Settings, contentDescription = "Settings")
-            }
-        })
-    }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).padding(18.dp),
-            horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Hey ${userName ?: "Spider"}. What are we doing today?", modifier = Modifier.fillMaxWidth())
-            Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(9.dp).background(stateColor(state), CircleShape))
-                Text("  ${state.name.lowercase()}", color = stateColor(state))
-            }
-            Spacer(Modifier.height(20.dp))
-            AstraOrb(state = state, modifier = Modifier.size(160.dp), size = 160.dp)
-            Spacer(Modifier.height(22.dp))
-            TextField(value = command, onValueChange = { command = it },
-                modifier = Modifier.fillMaxWidth(), placeholder = { Text("Tell ASTRA what to do...") }, singleLine = true)
-            Button(onClick = {
-                val text = command.trim()
-                if (text.isNotEmpty()) {
-                    command = ""
-                    scope.launch { repository.sendCommand(text) }
+    val isBusy = state == AssistantState.THINKING ||
+        state == AssistantState.PLANNING || state == AssistantState.EXECUTING
+
+    fun submitCommand(raw: String) {
+        val clean = raw.trim()
+        if (clean.isNotEmpty() && !isBusy) {
+            scope.launch { repository.sendCommand(clean) }
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text("ASTRA", style = MaterialTheme.typography.titleLarge)
+                        Text(
+                            "PERSONAL ASSISTANT  /  PHASE 1",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { navController.navigate(Screens.SETTINGS) }) {
+                        Icon(Icons.Filled.Settings, contentDescription = "Settings")
+                    }
                 }
-            }, modifier = Modifier.fillMaxWidth().padding(top = 10.dp)) { Text("Send command") }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Recent activity", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 18.dp))
-                TextButton(onClick = { navController.navigate(Screens.CHAT) }) { Text("Open chat") }
+            )
+        }
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
+            item {
+                Column(Modifier.fillMaxWidth()) {
+                    Text(
+                        "Hey " + (userName?.takeIf { it.isNotBlank() } ?: "Spider") + ".",
+                        style = MaterialTheme.typography.headlineMedium
+                    )
+                    Text(
+                        "What would you like to work on?",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
             }
-            if (recentTasks.isEmpty()) Text("No recent tasks yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            else LazyColumn(Modifier.fillMaxWidth()) {
-                items(recentTasks, key = { it.id }) { task ->
-                    Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                        Column(Modifier.padding(12.dp)) {
-                            Text(task.command, maxLines = 1)
-                            Text(task.status.name.lowercase(), color = taskColor(task.status))
+
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF0B1424)),
+                    shape = RoundedCornerShape(24.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 22.dp, horizontal = 18.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        AstraOrb(
+                            state = state,
+                            modifier = Modifier.size(172.dp),
+                            size = 172.dp,
+                            glowEnabled = true
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(8.dp).background(stateColor(state), CircleShape))
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                stateLabel(state),
+                                color = stateColor(state),
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            if (isBusy) "Working through your request…" else "Local demo mode · No device actions enabled",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Command console", style = MaterialTheme.typography.titleMedium)
+                    OutlinedTextField(
+                        value = command,
+                        onValueChange = { command = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Type a command for ASTRA…") },
+                        singleLine = true,
+                        enabled = !isBusy
+                    )
+                    Button(
+                        onClick = {
+                            submitCommand(command)
+                            command = ""
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = command.isNotBlank() && !isBusy
+                    ) {
+                        Text(if (isBusy) "Processing…" else "Send command")
+                    }
+                }
+            }
+
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Quick prompts", style = MaterialTheme.typography.titleMedium)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(onClick = { submitCommand("Show ASTRA status") }, enabled = !isBusy) {
+                            Text("System status")
+                        }
+                        OutlinedButton(onClick = { submitCommand("Help me plan my day") }, enabled = !isBusy) {
+                            Text("Plan my day")
+                        }
+                        OutlinedButton(onClick = { submitCommand("Help me focus for 25 minutes") }, enabled = !isBusy) {
+                            Text("Focus session")
                         }
                     }
                 }
             }
+
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Recent activity", style = MaterialTheme.typography.titleMedium)
+                    TextButton(onClick = { navController.navigate(Screens.CHAT) }) { Text("Open chat") }
+                }
+            }
+
+            if (tasks.isEmpty()) {
+                item {
+                    Text(
+                        "No activity yet. Try one of the quick prompts above.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            } else {
+                items(tasks.take(5), key = { it.id }) { task -> TaskRow(task) }
+            }
+
+            item {
+                Text(
+                    "ASTRA is currently running with a simulated assistant. Real AI, voice and device controls are added in later phases.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
         }
     }
 }
+
+@Composable
+private fun TaskRow(task: AssistantTask) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(task.command, maxLines = 2, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    task.result ?: task.error ?: "Demo task",
+                    maxLines = 2,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Text(
+                task.status.name.lowercase().replace('_', ' '),
+                color = taskColor(task.status),
+                style = MaterialTheme.typography.labelMedium
+            )
+        }
+    }
+}
+
+private fun stateLabel(state: AssistantState): String =
+    state.name.lowercase().replace('_', ' ').replaceFirstChar { it.uppercase() }
 
 private fun stateColor(state: AssistantState): Color = when (state) {
     AssistantState.IDLE -> Color(0xFF22D3EE)
@@ -83,6 +239,7 @@ private fun stateColor(state: AssistantState): Color = when (state) {
     AssistantState.COMPLETED -> Color(0xFF10B981)
     AssistantState.ERROR -> Color(0xFFF87171)
 }
+
 private fun taskColor(status: TaskStatus): Color = when (status) {
     TaskStatus.COMPLETED -> Color(0xFF10B981)
     TaskStatus.FAILED -> Color(0xFFF87171)

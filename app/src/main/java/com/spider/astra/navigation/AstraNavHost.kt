@@ -24,8 +24,14 @@ fun AstraNavHost(
     navController: NavHostController = rememberNavController()
 ) {
     NavHost(navController = navController, startDestination = Screens.DASHBOARD) {
-        composable(Screens.DASHBOARD) { DashboardScreen(navController, repository, settings) }
-        composable(Screens.CHAT) { ChatScreen(navController, repository, settings) }
-        composable(Screens.SETTINGS) { SettingsScreen(navController) }
+        composable(Screens.DASHBOARD) {
+            DashboardScreen(navController = navController, repository = repository, settings = settings)
+        }
+        composable(Screens.CHAT) {
+            ChatScreen(navController = navController, repository = repository)
+        }
+        composable(Screens.SETTINGS) {
+            SettingsScreen(navController = navController, settings = settings)
+        }
     }
 }
