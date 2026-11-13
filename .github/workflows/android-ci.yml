@@ -38,6 +38,11 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # The repository is missing gradle-wrapper.jar. Generate the standard
+      # wrapper files with the runner's Gradle, targeting the pinned 8.7 build.
+      - name: Generate Gradle wrapper
+        run: gradle :wrapper --gradle-version 8.7 --distribution-type bin
+
       - name: Validate Gradle wrapper
         run: |
           test -f gradle/wrapper/gradle-wrapper.jar
