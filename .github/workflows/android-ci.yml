@@ -1,0 +1,56 @@
+name: Android CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    # GitHub-hosted runners have Gradle, the Android SDK, and JDK pre-installed,
+    # so the Gradle-download blocker from the phone environment does not apply here.
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '21'
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Cache Android SDK
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.android/build-cache
+            ~/.gradle/caches/modules-2
+          key: ${{ runner.os }}-android-${{ hashFiles('**/*.gradle*') }}
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Assemble Debug APK
+        # Gradle wrapper downloads Gradle 8.14 automatically on the runner.
+        run: ./gradlew :app:assembleDebug
+
+      - name: Upload debug APK as artifact
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: astra-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30

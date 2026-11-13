@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.spider.astra">
+
+    <!--
+      ASTRA does NOT request the SYSTEM_ALERT_WINDOW / TYPE_APPLICATION_OVERLAY
+      permission here. The floating bubble (Phase 2) requires the user to grant
+      "Display over other apps" via a settings intent, handled at runtime.
+    -->
+
+    <!-- Internet is used ONLY by the optional future Python-backend integration
+         (Phase 5). No backend is contacted in Phase 1. Declared here so the
+         integration layer can be added later without a manifest change. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Astra"
+        android:usesCleartextTraffic="false">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.Astra"
+            android:windowSoftInputMode="adjustResize"
+            android:screenOrientation="unspecified">
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+    </application>
+
+</manifest>

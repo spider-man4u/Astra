@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Astra" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- We override everything in Compose; this keeps the window dark. -->
+        <item name="android:windowBackground">@color/astra_background</item>
+        <item name="android:colorPrimary">@color/astra_accent_cyan</item>
+        <item name="android:colorPrimaryDark">#050A14</item>
+        <item name="android:colorAccent">@color/astra_accent_cyan</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@color/astra_background</item>
+    </style>
+</resources>

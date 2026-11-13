@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Deep navy / near-black background -->
+    <color name="astra_background">#050A14</color>
+    <color name="astra_surface">#0B1424</color>
+    <color name="astra_surface_elevated">#101C30</color>
+
+    <!-- Electric cyan accents -->
+    <color name="astra_accent_cyan">#22D3EE</color>
+    <color name="astra_accent_cyan_dim">#158A9A</color>
+    <color name="astra_accent_blue">#3B82F6</color>
+
+    <!-- Text -->
+    <color name="astra_text_primary">#F8FAFC</color>
+    <color name="astra_text_secondary">#94A3B8</color>
+    <color name="astra_text_muted">#64748B</color>
+
+    <!-- State colors -->
+    <color name="astra_state_idle">#22D3EE</color>
+    <color name="astra_state_listening">#3B82F6</color>
+    <color name="astra_state_thinking">#8B5CF6</color>
+    <color name="astra_state_planning">#F59E0B</color>
+    <color name="astra_state_executing">#EF4444</color>
+    <color name="astra_state_completed">#10B981</color>
+    <color name="astra_state_error">#F87171</color>
+    <color name="astra_state_waiting_permission">#F59E0B</color>
+
+    <!-- Misc -->
+    <color name="astra_divider">#1E293B</color>
+    <color name="astra_glass">rgba(16, 28, 48, 0.6)</color>
+</resources>
