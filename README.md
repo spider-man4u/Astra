@@ -1,186 +1,95 @@
 # ASTRA
 
-**Project codename:** ASTRA
-**Owner:** Spider
-**Package:** `com.spider.astra`
-**Platform:** Android (tablet-first, responsive)
-**Primary device:** Redmi Pad Pro 5G — Snapdragon 7s Gen 2, 8GB RAM, Android 16
+**Package:** `com.spider.astra`  
+**Platform:** Native Android (tablet-first)  
+**Primary device:** Redmi Pad Pro 5G · Android 16 · 8 GB RAM
 
-> "An intelligent companion that lives inside your device."
+ASTRA is a personal Android assistant concept inspired by JARVIS / FRIDAY / EDITH. The planned experience is a persistent floating orb with conversational AI and carefully permissioned device actions.
 
-ASTRA is a native Android personal AI assistant inspired by JARVIS/FRIDAY/EDITH —
-not a generic chatbot. Its core identity is a **floating AI bubble** that stays
-above other apps while ASTRA works in the background.
+## Current milestone: Phase 1 — Application Foundation
 
----
+<details>
+<summary>Phase 1 delivery status</summary>
 
-## Milestone status (Phase 0 → Phase 1)
+- [x] Android Gradle project and CI build pipeline
+- [x] Compose app theme and animated, state-aware orb
+- [x] Dashboard with command input and working quick prompts
+- [x] Reactive mock conversation and message history
+- [x] Task lifecycle and recent-activity panel
+- [x] Dashboard / Chat / Settings navigation
+- [x] DataStore preferences for display name, theme mode and voice preference
+- [x] Debug APK built and uploaded by GitHub Actions
+- [ ] Install on the Redmi Pad Pro and complete on-device visual / interaction smoke test
 
-This repository currently contains **Phase 1 — Application Foundation**:
+**Important:** CI proves the source compiles and packages. It does not prove the APK has been installed or visually tested on the target tablet yet.
 
-- Valid Android Gradle project (Kotlin, Gradle 8.14, AGP 8.5.0, JDK 21)
-- Jetpack Compose dashboard (dark futuristic theme)
-- Animated central ASTRA orb with per-state visuals (IDLE/LISTENING/THINKING/
-  PLANNING/EXECUTING/WAITING_FOR_PERMISSION/COMPLETED/ERROR)
-- Text command input with send
-- Mock conversation (AssistantRepository + MockAssistantRepository) — **no real
-  backend is claimed to be connected**
-- DataStore-backed user preferences
-- Navigation host (Dashboard / Chat / Settings stub)
-- Overlay-permission settings entry point (Phase 2 bubble permission)
+</details>
 
-**Not yet built:** the floating overlay bubble (Phase 2), voice (Phase 4), and the
-Python-backend integration (Phase 5) are planned future milestones.
+### What works in this build
 
----
+- **Dashboard:** animated orb, current assistant state, command console, quick prompts and recent activity.
+- **Chat:** reactive message history, send controls, busy state and clear mock-mode disclosure.
+- **Settings:** saved display name, System / Dark / Light theme selection, and a saved voice preference flag.
+- **Mock assistant:** simulates Thinking → Planning → Executing → Completed and records a task.
 
-## Build toolchain blocker (read first)
+All assistant replies in Phase 1 come from `MockAssistantRepository`. No real AI provider is connected and no device action is executed. The voice preference is stored only; microphone and speech features are not implemented yet.
 
-This environment (OpenCode Mobile on Android, Ubuntu 24.04 aarch64) had **no JDK,
-no Gradle, and no Android SDK** installed. During Phase 0 I installed:
+## Build configuration
 
-| Tool | Version | Source |
-|------|---------|--------|
-| OpenJDK JDK | 21.0.13 | `apt` (`openjdk-21-jdk-headless`) |
-| Android SDK cmdline-tools | 11076708 | `dl.google.com` |
-| SDK Platform | android-35 (API 35) | `sdkmanager` |
-| SDK Build-Tools | 35.0.0 | `sdkmanager` |
-| SDK Platform-Tools | 37.0.1 | `sdkmanager` |
-| Gradle | 8.14 | download in progress (see below) |
+| Component | Version |
+|---|---|
+| Android Gradle Plugin | 8.5.0 |
+| Gradle wrapper distribution | 8.7 |
+| Kotlin | 1.9.24 |
+| Compose Compiler | 1.5.14 |
+| Compose BOM | 2024.06.00 |
+| compileSdk / targetSdk | 35 / 35 |
+| minSdk | 24 |
+| JDK in CI | 21 |
 
-**Gradle download is blocked/slow.** The official Gradle distribution hosts
-(`services.gradle.org`, `downloads.gradle.org`) return ~30 bytes/s (effectively
-blocked) from this network; `gradle.org` sustains only ~1–7 KB/s with frequent
-stalls. The ~130 MB `gradle-8.14-bin.zip` therefore cannot be fetched reliably
-within this session.
+The CI workflow generates the missing Gradle wrapper JAR on the GitHub-hosted runner, validates it, builds the debug APK and uploads the artifact.
 
-**To build, you need Gradle 8.14.** Options:
+## Download the debug APK
 
-1. **Transfer the project** to a machine with internet + Android Studio (or a
-   working `gradle` 8.x) and run `./gradlew :app:assembleDebug` (or
-   `gradle :app:assembleDebug`).
-2. **Retry the download** from this environment when connectivity to
-   `gradle.org`/`services.gradle.org` improves:
-   ```
-   cd /opt/android
-   wget -c -t 0 https://gradle.org/distributions/gradle-8.14-bin.zip
-   ```
-   (A background `wget` with infinite retries was started during development;
-   check `/opt/android/gradle-8.14-bin.zip`.)
+1. Open the [latest Android CI run](https://github.com/spider-man4u/Astra/actions/workflows/android-ci.yml).
+2. Open the newest successful run on `master`.
+3. In **Artifacts**, download `astra-debug-apk`.
+4. Extract the ZIP and install `app-debug.apk` on the tablet.
 
-Once Gradle 8.14 is available:
+Artifacts are retained for 30 days.
+
+## Local build
+
+Requirements: JDK 17 or 21, Android SDK platform 35, Build Tools 35.0.0, and Gradle 8.7.
+
+This repository currently generates `gradle-wrapper.jar` in CI rather than committing the binary. On a machine with Gradle 8.7 installed, run:
 
 ```bash
-export ANDROID_HOME=/opt/android
-export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-arm64
-export PATH=/opt/android/gradle-8.14/bin:$PATH   # after extracting the zip
-cd /root/projects/ASTRA
-
-# Debug build
-gradle :app:assembleDebug
-
-# Install on a connected device (adb from $ANDROID_HOME/platform-tools)
-$ANDROID_HOME/platform-tools/adb install -r app/build/outputs/apk/debug/app-debug.apk
+gradle :wrapper --gradle-version 8.7 --distribution-type bin
+./gradlew :app:assembleDebug
 ```
 
-The APK will appear at `app/build/outputs/apk/debug/app-debug.apk`.
-
-## Automatic builds with GitHub Actions
-
-A CI workflow lives at `.github/workflows/android-ci.yml`. On every push to `master` it:
-
-1. Checks out the repo
-2. Sets up JDK 21
-3. Runs `./gradlew :app:assembleDebug`
-4. Uploads the debug APK as a workflow artifact (30-day retention)
-
-You can download the APK from the GitHub Actions run page → "Artifacts" → `astra-debug-apk`, then install on the Redmi Pad Pro with `adb install -r app-debug.apk`.
-
-**Prerequisite before the first workflow run:** generate the Gradle wrapper on a machine that has Gradle 8.14:
-```
-gradle wrapper --gradle-version 8.14
-```
-This creates `gradlew`, `gradlew.bat`, and `gradle/wrapper/gradle-wrapper.jar` (the last two are required for `./gradlew` to work). Commit and push them, then GitHub Actions builds automatically.
-
----
-
-## Project structure
+APK output:
 
 ```
-ASTRA/
-├── app/
-│   ├── build.gradle
-│   └── src/main/
-│       ├── AndroidManifest.xml
-│       ├── res/
-│       │   ├── values/colors.xml, themes.xml, strings.xml
-│       │   ├── drawable/
-│       │   └── layout/
-│       └── java/com/spider/astra/
-│           ├── MainActivity.kt
-│           ├── navigation/AstraNavHost.kt
-│           ├── ui/
-│           │   ├── theme/AstraTheme.kt
-│           │   ├── components/AstraOrb.kt
-│           │   ├── dashboard/DashboardScreen.kt
-│           │   ├── chat/ChatScreen.kt
-│           │   └── settings/SettingsScreen.kt
-│           ├── assistant/
-│           │   ├── core/AssistantRepository.kt
-│           │   ├── core/MockAssistantRepository.kt
-│           │   ├── models/AssistantMessage.kt
-│           │   ├── models/AssistantResponse.kt
-│           │   └── state/AssistantTask.kt
-│           ├── permissions/
-│           ├── data/settings/AstraSettings.kt
-│           └── integration/   (backend/android — future phases)
-├── build.gradle
-├── settings.gradle
-├── gradle.properties
-├── gradle/wrapper/gradle-wrapper.properties
-├── PROGRESS.md
-└── README.md
+app/build/outputs/apk/debug/app-debug.apk
 ```
 
----
+## Planned phases
 
-## Architecture notes
+| Phase | Scope |
+|---|---|
+| 2 | Floating bubble, overlay permission flow and foreground service |
+| 3 | Background task handling and safe action execution |
+| 4 | Speech recognition and text-to-speech |
+| 5 | Secure connection to the existing Python backend in Termux |
+| 6 | Device integrations, permission gates and allowlisted actions |
 
-- **MVVM-ish separation**: `MainActivity` only wires the repository, settings, and
-  navigation host. Business logic lives in `assistant/core/`; UI lives in `ui/`.
-- **Mock backend**: `MockAssistantRepository` simulates a
-  thinking → planning → executing → completed cycle. It never fabricates device
-  capabilities and never claims a real backend connection.
-- **Permissions**: declared only `INTERNET` (for the future backend integration).
-  The `SYSTEM_ALERT_WINDOW`/overlay permission is **not** declared in the manifest;
-  it is requested at runtime via `Settings.ACTION_MANAGE_OVERLAY_PERMISSION` in
-  Phase 2.
-- **No secrets**: no API keys, Gemini/Groq credentials, or tokens are stored in
-  the APK.
+The existing Termux Python backend is separate from this Android project and must not be overwritten during app development.
 
----
+## Security boundaries
 
-## Backend integration (Phase 5, future)
-
-The owner already has a Python ASTRA backend running in Termux
-(`astra.py`, `hands.py`, `senses.py`, SQLite memory). That backend is **not**
-accessed by this Phase 1 app and must not be overwritten.
-
-The integration interface (`AssistantRepository` / `AssistantApi`) is designed so
-a later implementation can connect to the Python backend through a **local,
-authenticated HTTP API** (or another local IPC). Exact integration steps are to
-be documented when the backend endpoint and auth mechanism are confirmed.
-
-**Do not hardcode API keys.** Do not put Gemini/Groq credentials in the APK.
-
----
-
-## Safety rules (observed)
-
-- Permissions requested only when needed, with explanation.
-- No silent screen capture, no silent messaging, no payments, no arbitrary
-  shell execution without validation.
-- Root-powered actions (future) will use a restricted allowlist + explicit
-  confirmation for dangerous operations.
-- Audit trail for sensitive actions.
-- Honest error reporting: no fake success messages.
+- No provider API keys or credentials are embedded in the APK.
+- No arbitrary shell execution, silent screen capture, messaging or payments.
+- Sensitive future actions must use an allowlist and explicit confirmation.
+- The UI must report mock / offline state honestly rather than fabricate success.

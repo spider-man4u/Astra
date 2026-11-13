@@ -1,150 +1,78 @@
 # ASTRA — Development Progress
 
-> Project codename: ASTRA | Owner: Spider | Package: com.spider.astra
-> Target device: Redmi Pad Pro 5G (Android 16, tablet-first, responsive)
+**Project:** ASTRA  
+**Package:** `com.spider.astra`  
+**Target:** Redmi Pad Pro 5G · Android 16 · tablet-first  
+**Last verified:** 13 November 2026
 
-## PHASE 0 — Environment Inspection (COMPLETE)
+## Phase 0 — Environment inspection
 
-### Environment
-- Host: Ubuntu 24.04.5 LTS (aarch64) running inside OpenCode Mobile on Android
-- RAM: 7.3Gi total (~108Mi free, 1.9Gi available, 8Gi swap)
-- Disk: 104G, 63G available
-- Root: yes (uid=0)
+**Status: COMPLETE**
 
-### Toolchain status (BEFORE)
-| Tool | Status |
-|------|--------|
-| Java (JDK) | ❌ Not installed (`java: command not found`) |
-| Gradle | ❌ Not installed |
-| Android SDK | ❌ Not installed (no ANDROID_HOME) |
-| Node.js | ✅ v24.21.0 |
-| apt / network | ✅ Working (Ubuntu ports mirror reachable) |
+The initial coding environment was inspected and the required JDK, Android SDK command-line tools, API 35 platform, Build Tools 35.0.0 and Gradle 8.x toolchain were prepared in the OpenCode Mobile workspace.
 
-### Toolchain status (AFTER — installed during Phase 0)
-| Tool | Version | Source |
-|------|---------|--------|
-| OpenJDK JDK | 21.0.13 | apt (`openjdk-21-jdk-headless`) |
-| Gradle | 8.14 | Downloading from services.gradle.org (slow; in progress) |
-| Android SDK cmdline-tools | 11076708 | dl.google.com |
-| SDK Platform | android-35 (API 35) | sdkmanager |
-| SDK Build-Tools | 35.0.0 | sdkmanager |
-| SDK Platform-Tools | 37.0.1 | sdkmanager |
+The Termux Python backend is a separate environment and was not modified by Phase 1.
 
-### Notes
-- `apt`'s Gradle (4.4.1) is far too old for modern AGP; official Gradle 8.14 distribution downloaded instead.
-- Debian's `android-sdk-platform-23` (API 23) is too old; official SDK platform 35 installed via sdkmanager.
-- Android 16 = API 36. We compile against API 35 (stable, widely supported) and run on Android 16.
-- No Termux present; the existing Python ASTRA backend (in Termux) is separate and NOT accessed by this milestone.
+## Phase 1 — Application foundation
 
-## Proposed Project Structure
-```
-ASTRA/
-├── app/
-│   ├── build.gradle
-│   └── src/main/
-│       ├── AndroidManifest.xml
-│       ├── res/
-│       │   ├── values/ (colors, themes, strings)
-│       │   ├── drawable/
-│       │   └── layout/
-│       └── java/com/spider/astra/
-│           ├── MainActivity.kt
-│           ├── navigation/
-│           ├── ui/
-│           │   ├── dashboard/      (DashboardScreen, AstraOrb)
-│           │   ├── chat/           (ChatScreen, messages)
-│           │   ├── bubble/         (Bubble states — Phase 2)
-│           │   ├── settings/       (SettingsScreen)
-│           │   └── components/     (shared Compose widgets)
-│           ├── services/
-│           │   └── overlay/        (OverlayService — Phase 2)
-│           ├── assistant/
-│           │   ├── core/           (AssistantRepository, MockAssistantRepository)
-│           │   ├── models/         (AssistantMessage, AssistantResponse, ...)
-│           │   └── state/          (AssistantState, BubbleState)
-│           ├── permissions/
-│           │   └── OverlayPermissionHelper.kt
-│           ├── data/
-│           │   ├── memory/         (future Room DB — not Phase 1)
-│           │   └── settings/       (DataStore preferences)
-│           └── integration/
-│               ├── backend/        (AssistantApi abstraction — Phase 5)
-│               └── android/        (device info — Phase 6)
-├── build.gradle
-├── settings.gradle
-├── gradle.properties
-├── gradlew / gradle/wrapper/
-├── README.md
-└── PROGRESS.md
-```
+**Status: IMPLEMENTED · CI BUILD SUCCESSFUL · DEVICE TEST PENDING**
 
-## Dependency & SDK Compatibility Report
-- compileSdk: 35, targetSdk: 35, minSdk: 24
-- AGP: 8.5.0 (compatible with Gradle 8.14, JDK 21)
-- Kotlin: 1.9.24
-- Jetpack Compose BOM: 2024.06.00 (Compose 1.6.x)
-- DataStore Preferences: 1.1.1
-- Coroutines: 1.9.0
-- All dependencies resolve from google() + mavenCentral()
+### Delivered
 
-## PHASE 1 Plan — Application Foundation
-1. `settings.gradle` / `build.gradle` / `app/build.gradle` / `gradle.properties`
-2. `AndroidManifest.xml` (debuggable, no overlay permission yet — Phase 2)
-3. Theme + colors (deep navy, electric cyan accents)
-4. `MainActivity.kt` + Compose navigation host
-5. `DashboardScreen` — header, greeting, central orb, command input, quick actions, activity panel
-6. `AstraOrb` — animated idle state (Compose animation)
-7. `AssistantRepository` interface + `MockAssistantRepository` (no real backend claimed)
-8. `AssistantMessage` / `AssistantResponse` models
-9. Build APK, install, verify dashboard opens + orb animates + mock conversation works
+- Android app module, manifest, theme resources and launcher icon.
+- Kotlin 1.9.24, AGP 8.5.0, Gradle 8.7 wrapper distribution and Compose Compiler 1.5.14.
+- Jetpack Compose Material 3 theme with System / Dark / Light selection.
+- Main activity and Dashboard / Chat / Settings navigation.
+- Animated cyan ASTRA orb with state-aware colors and pulse animation.
+- Dashboard command console, quick prompts and recent task panel.
+- Assistant repository interface with a local mock implementation.
+- Reactive StateFlows for assistant state, messages and tasks.
+- Mock command lifecycle: Thinking → Planning → Executing → Completed.
+- Chat screen with live conversation history and send control.
+- DataStore-backed display name, theme mode and voice preference.
+- Clear UI disclosure that the current assistant is mock-only and does not execute device actions.
 
-## Blockers (confirmed during Phase 0)
-- **Gradle toolchain unavailable in this environment.** All Gradle distribution hosts are unreachable or effectively blocked from this network:
-  - `services.gradle.org` / `downloads.gradle.org`: ~30 bytes/s (blocked)
-  - `gradle.org`: ~1–7 KB/s with frequent stalls; `wget` obtained 0 bytes
-  - The ~130 MB `gradle-8.14-bin.zip` cannot be fetched reliably here.
-  - `apt` only offers Gradle 4.4.1 (far too old for AGP 8.5 / Compose).
-- **The `gradle-wrapper.jar` is not present.** It is normally generated by `gradle wrapper`; without it `./gradlew` cannot run even on GitHub Actions.
+### CI verification
 
-## Phase 1 status
-- Source code: COMPLETE (12 Kotlin files + 3 resource files + manifest + Gradle config + CI workflow)
-- Compiled/built: NOT YET — blocked by missing Gradle / wrapper jar in this environment
+- **Commit:** `c74c47afc1671a5ba7ba9e4dad1cce6471a2ede0`
+- **Workflow:** [Android CI — run 43386004013](https://github.com/spider-man4u/Astra/actions/runs/43386004013)
+- **Build task:** `:app:assembleDebug` — successful
+- **Artifact:** `astra-debug-apk`
+- **Artifact size:** 9,188,980 bytes (about 9.19 MB)
+- **Artifact retention:** 30 days
 
-## Recommended path: GitHub Actions automatic build
-GitHub-hosted runners have Gradle, the Android SDK, and JDK pre-installed, so the Gradle-download blocker does not apply there.
+The Compose compiler mismatch was fixed by changing the compiler extension from 1.5.12 to 1.5.14, which is compatible with Kotlin 1.9.24.
 
-Steps:
-1. **Create a GitHub repo** named `ASTRA` (private is fine) and push this project:
-   ```
-   cd /root/projects/ASTRA
-   git remote add origin https://github.com/<YOUR-USER>/ASTRA.git
-   git branch -M master
-   git add -A
-   git commit -m "Phase 1: ASTRA application foundation"
-   git push -u origin master
-   ```
-2. **Generate the Gradle wrapper** on any machine that has Gradle 8.14 (or install it via SDKMAN/brew/apt), in a cloned copy of the repo:
-   ```
-   cd ASTRA
-   gradle wrapper --gradle-version 8.14
-   git add gradlew gradlew.bat gradle/wrapper/gradle-wrapper.jar gradle/wrapper/gradle-wrapper.properties
-   git commit -m "Add Gradle wrapper"
-   git push
-   ```
-   This produces the missing `gradle-wrapper.jar`. Until this is done, `./gradlew` will not run.
-3. **GitHub Actions builds automatically** on every push to `master` (see `.github/workflows/android-ci.yml`). It assembles `app-debug.apk` and uploads it as a workflow artifact (retained 30 days).
-4. **Download the APK** from the Actions run page on GitHub → "Artifacts" → `astra-debug-apk`, then install on the Redmi Pad Pro:
-   ```
-   adb install -r app-debug.apk
-   ```
+### Remaining Phase 1 acceptance check
 
-Alternative (local build): once Gradle 8.14 is available on any machine,
-`export ANDROID_HOME=/opt/android JAVA_HOME=/usr/lib/jvm/java-21-openjdk-arm64`
-then `gradle :app:assembleDebug` → `app/build/outputs/apk/debug/app-debug.apk`.
+CI verifies compilation and APK packaging only. The APK still needs to be installed and smoke-tested on the Redmi Pad Pro:
 
-## Next steps (owner action)
-- Create the GitHub repo and push (step 1 above).
-- Generate the Gradle wrapper (step 2) — this is the one thing that needs a machine with Gradle.
-- Verify the first GitHub Actions run produces the APK.
-- Install on the Redmi Pad Pro and verify: dashboard opens, orb animates, mock text conversation works.
-- Once Phase 1 builds, proceed to Phase 2 (floating bubble + overlay permission).
+1. App launches and dashboard renders.
+2. Orb animates and changes color while the mock assistant processes a command.
+3. Quick prompts create a task and add user / assistant messages.
+4. Chat screen displays the same conversation history.
+5. Display name and theme preference survive app restarts.
+6. App handles portrait / landscape and tablet-sized layout acceptably.
+
+## Phase 2 — Next milestone
+
+Planned only; not implemented in this build:
+
+- Floating bubble and overlay permission rationale.
+- Foreground service with proper Android lifecycle handling.
+- Explicit permission flow and return-to-app handling.
+- No automatic overlay launch or hidden permissions.
+
+## Phase 3–6 — Future scope
+
+- Phase 3: background task orchestration and safe action execution.
+- Phase 4: speech recognition and text-to-speech.
+- Phase 5: authenticated local connection to the existing Termux Python backend.
+- Phase 6: allowlisted Android device integrations with explicit confirmation for sensitive actions.
+
+## Project safety notes
+
+- Do not overwrite the existing Termux backend while working on this Android app.
+- Do not hardcode Gemini / Groq / other provider credentials in source or APK.
+- Do not claim that mock commands performed real actions.
+- Do not execute arbitrary shell commands or perform sensitive actions without explicit user approval.
