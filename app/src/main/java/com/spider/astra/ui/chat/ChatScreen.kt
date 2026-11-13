@@ -76,7 +76,7 @@ fun ChatScreen(
     DisposableEffect(lifecycleOwner, voiceController) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_STOP) {
-                voiceController.stopListening()
+                voiceController.cancelListening()
                 voiceController.stopSpeaking()
             }
         }
@@ -249,6 +249,8 @@ fun ChatScreen(
                         )
                     } else if (voiceState.isSpeaking) {
                         Text("ASTRA is speaking your reply…", color = AstraPalette.Violet, fontSize = 10.sp)
+                    } else if (!voiceState.recognitionAvailable) {
+                        Text("No speech recognition service is available. Enable a recognizer in Android Settings.", color = AstraPalette.Amber, fontSize = 10.sp)
                     } else if (voiceState.errorMessage != null) {
                         Text(voiceState.errorMessage.orEmpty(), color = AstraPalette.Amber, fontSize = 10.sp)
                     } else if (voiceResponsesEnabled && !voiceState.ttsReady) {

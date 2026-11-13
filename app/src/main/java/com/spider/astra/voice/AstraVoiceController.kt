@@ -77,8 +77,13 @@ class AstraVoiceController(context: Context) {
                     }
                 })
 
-                val result = engine.setLanguage(Locale.forLanguageTag(VoiceLanguages.ENGLISH_INDIA))
-                ttsInitialized = result >= TextToSpeech.LANG_AVAILABLE
+                val requestedResult = engine.setLanguage(Locale.forLanguageTag(VoiceLanguages.ENGLISH_INDIA))
+                val supported = if (requestedResult >= TextToSpeech.LANG_AVAILABLE) {
+                    true
+                } else {
+                    engine.setLanguage(Locale.US) >= TextToSpeech.LANG_AVAILABLE
+                }
+                ttsInitialized = supported
                 _state.value = _state.value.copy(
                     ttsReady = ttsInitialized,
                     errorMessage = if (ttsInitialized) null
@@ -135,7 +140,6 @@ class AstraVoiceController(context: Context) {
         }
 
         try {
-            speechRecognizer.cancel()
             speechRecognizer.startListening(intent)
         } catch (_: Exception) {
             _state.value = _state.value.copy(
@@ -147,6 +151,16 @@ class AstraVoiceController(context: Context) {
 
     fun stopListening() {
         if (_state.value.isListening) runCatching { recognizer?.stopListening() }
+    }
+
+    /** Cancel without accepting a final result when the screen/app backgrounds. */
+    fun cancelListening() {
+        if (_state.value.isListening) runCatching { recognizer?.cancel() }
+        _state.value = _state.value.copy(
+            isListening = false,
+            partialTranscript = "",
+            transcript = null
+        )
     }
 
     fun speak(text: String, languageTag: String) {

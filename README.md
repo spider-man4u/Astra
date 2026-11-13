@@ -1,85 +1,83 @@
 # ASTRA
 
 **Package:** `com.spider.astra`  
-**Platform:** Native Android (tablet-first)  
-**Primary device:** Redmi Pad Pro 5G · Android 16 · 8 GB RAM
+**Platform:** Native Android · tablet-first  
+**Primary test device:** Redmi Pad Pro 5G · Android 16 · 8 GB RAM
 
-ASTRA is a personal Android assistant concept inspired by JARVIS / FRIDAY / EDITH. Its planned experience is a floating orb, conversational AI and carefully permissioned device actions.
+ASTRA is a personal Android assistant concept inspired by JARVIS / FRIDAY / EDITH. Its experience is a holographic dashboard, a user-controlled floating orb, a local task engine and voice interaction.
 
-## Current milestone status
+## Current milestones
 
-### Phase 1 — Application foundation
+### Phase 1 — App foundation
 
-**Implemented and CI build verified.** Includes the holographic Compose dashboard, animated orb, quick prompts, reactive mock chat, task history and DataStore-backed user preferences.
+**Implemented and CI verified.** Holographic Compose dashboard, animated orb, command dock, quick actions, chat, task history and DataStore preferences.
 
 ### Phase 2 — Floating interface
 
-**Implemented and CI build verified · target-device testing pending.**
+**Implemented and CI verified · owner device test passed.** Permission-gated floating orb, expanded panel, drag-to-move, open/minimize/stop actions and persistent notification.
 
-- User-triggered overlay permission flow from Settings.
-- Floating orb hosted by a foreground service.
-- Tap the orb to expand the compact control panel.
-- Drag the orb or expanded panel to reposition it.
-- Open ASTRA from the panel, minimize back to the orb, or stop the service.
-- Persistent low-priority foreground notification with a Stop action.
-- Overlay access can be managed or revoked by the user in Android Settings.
+### Phase 3 — Safe background task engine
 
-The service is an interface shell only. It does not read other apps, capture the screen, use the microphone, execute shell commands, or perform device actions. The assistant backend remains mock-only.
+**Implemented and CI verified.** WorkManager queue, DataStore-backed task and note history, cancellation, timeout/error handling and explicit action allowlist.
 
-## Permissions and Android behaviour
+Current actions:
+- System status: read-only.
+- Save private note: requires an explicit Confirm action.
+- Unsupported requests: rejected without execution.
 
-ASTRA requests `SYSTEM_ALERT_WINDOW` because Android requires explicit user approval before an app can display a `TYPE_APPLICATION_OVERLAY` window. The floating service starts only from an explicit action while the app is visible.
+### Phase 4 — Voice interface
 
-On Android 14 and later, the service declares the `specialUse` foreground-service type and explains its floating-interface use in the manifest. This is a system declaration, not a Play Store approval. A store release would still need the applicable foreground-service policy review.
+**Implemented in this build · Redmi Pad Pro voice test pending.**
+- Tap-to-talk in Chat with runtime microphone permission.
+- Partial transcript preview and final speech recognition.
+- Prefer on-device recognition when Android reports it available; otherwise use the installed system recognizer.
+- English (India) and Hindi (India) voice language preference.
+- Text-to-speech for replies when enabled, plus per-message speaker controls.
+- Recognition is cancelled when the app leaves the foreground; SpeechRecognizer and TextToSpeech resources are released when Chat is closed.
 
-Android 13+ notification permission is requested separately. It is optional for starting the foreground service; denying it does not grant overlay access and does not block the user-enabled orb.
+This is not an always-listening wake-word system. The microphone is activated only after the user taps the mic and grants Android's `RECORD_AUDIO` permission. If Android has no on-device recognizer, its configured speech service is used and may rely on a network connection.
 
-## What works in the current build
+## Android permissions and privacy
 
-- **Dashboard:** holographic orb, state indicator, command dock, quick-access tiles and recent activity.
-- **Chat:** live message history, send controls and clear mock-mode disclosure.
-- **Settings:** display name, System / Dark / Light appearance, voice preference, overlay permission and floating-orb controls.
-- **Floating interface:** movable orb, expanded mini panel, open-app / minimize / stop controls.
-- **Mock assistant:** simulates Thinking → Planning → Executing → Completed and records a task.
+- `SYSTEM_ALERT_WINDOW`: user-approved floating overlay.
+- `RECORD_AUDIO`: requested when the user taps the microphone.
+- Notification permission: separately requested for the floating foreground-service notification.
 
-No real AI provider is connected. Voice preference is stored only; speech recognition and speech output are not implemented yet.
+ASTRA does not start background microphone capture and does not persist raw audio recordings. Speech recognition is delegated to Android's configured speech-recognition service.
 
 ## Build configuration
 
 | Component | Version |
 |---|---|
-| Android Gradle Plugin | 8.5.0 |
+| Android Gradle Plugin | 8.6.0 |
 | Gradle wrapper distribution | 8.7 |
-| Kotlin | 1.9.24 |
-| Compose Compiler | 1.5.14 |
+| Kotlin | 2.1.20 |
+| Compose Compiler plugin | 2.1.20 |
 | Compose BOM | 2024.06.00 |
+| WorkManager | 2.12.0 |
 | compileSdk / targetSdk | 35 / 35 |
 | minSdk | 24 |
 | JDK in CI | 21 |
 
-GitHub Actions generates the Gradle wrapper JAR on the hosted runner, validates it, builds the debug APK and uploads the artifact for 30 days.
+GitHub Actions runs unit tests, builds the debug APK and uploads the artifact for 30 days.
 
-## Download the debug APK
+## Install the debug APK
 
 1. Open [Android CI runs](https://github.com/spider-man4u/Astra/actions/workflows/android-ci.yml).
 2. Open the latest successful run on `master`.
-3. In **Artifacts**, download `astra-debug-apk`.
-4. Extract and install `app-debug.apk` on the tablet.
+3. Download the `astra-debug-apk` artifact and extract `app-debug.apk`.
+4. Install it on the tablet.
 
-## Planned next phases
+## Next milestone — Phase 5
 
-| Phase | Scope |
-|---|---|
-| 3 | Background task orchestration and safe action execution |
-| 4 | Speech recognition and text-to-speech |
-| 5 | Secure connection to the existing Python backend in Termux |
-| 6 | Device integrations, permission gates and allowlisted actions |
-
-The existing Termux Python backend is separate from this Android project and must not be overwritten during app development.
+- Authenticated connection from Android app to the existing Python backend in Termux.
+- Localhost bridge lifecycle, health check, request IDs, timeouts and clear offline status.
+- Keep API keys and provider credentials in Termux, never in the APK.
+- Continue routing sensitive operations through the task allowlist and approval flow.
 
 ## Security boundaries
 
 - No provider API keys or credentials are embedded in the APK.
 - No arbitrary shell execution, silent screen capture, messaging or payments.
-- Sensitive future actions must use an allowlist and explicit confirmation.
-- The UI must report mock / offline state honestly rather than fabricate success.
+- Sensitive future actions must use a small allowlist and explicit confirmation.
+- The UI must report local/demo state honestly rather than fabricating success.

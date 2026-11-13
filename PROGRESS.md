@@ -1,73 +1,75 @@
 # ASTRA — Development Progress
 
-**Project:** ASTRA  
 **Package:** `com.spider.astra`  
-**Target:** Redmi Pad Pro 5G · Android 16 · tablet-first  
-**Last verified:** 13 November 2026
+**Target device:** Redmi Pad Pro 5G · Android 16 · tablet-first  
+**Last updated:** 13 November 2026
 
 ## Phase 0 — Environment inspection
 
-**Status: COMPLETE**
+**COMPLETE.** Android build environment was prepared in the OpenCode Mobile workspace. The Termux Python backend remains a separate project and has not been overwritten.
 
-The initial coding environment was inspected and the required JDK, Android SDK command-line tools, API 35 platform, Build Tools 35.0.0 and Gradle 8.x toolchain were prepared in the OpenCode Mobile workspace. The Termux Python backend is separate and has not been modified.
+## Phase 1 — App foundation
 
-## Phase 1 — Application foundation
+**IMPLEMENTED · CI BUILD SUCCESSFUL · OWNER VISUAL TEST COMPLETED**
 
-**Status: IMPLEMENTED · CI BUILD SUCCESSFUL · DEVICE VISUAL TEST COMPLETED BY OWNER**
-
-Delivered:
-- Android app module, manifest, theme resources and launcher icon.
-- Kotlin 1.9.24, AGP 8.5.0, Gradle 8.7 and Compose Compiler 1.5.14.
-- Holographic dashboard, animated orb, command dock and quick-access tiles.
-- Reactive mock conversation, task state and recent activity.
-- Dashboard / Chat / Settings navigation.
-- DataStore-backed display name, appearance mode and voice preference.
-
-The owner installed the Phase 1 build and provided dashboard / settings screenshots. This feedback prompted the holographic redesign.
+- Kotlin Android app, Compose navigation and theme.
+- Holographic dashboard, animated orb, quick actions and command dock.
+- Chat and local repository.
+- DataStore preferences.
 
 ## Phase 2 — Floating interface
 
-**Status: IMPLEMENTED · CI BUILD SUCCESSFUL · REDMI PAD PRO RUNTIME TEST PENDING**
+**IMPLEMENTED · CI BUILD SUCCESSFUL · OWNER DEVICE TEST PASSED**
 
-Delivered:
-- `SYSTEM_ALERT_WINDOW` permission declaration and explicit Settings hand-off.
-- Permission status refresh when returning to ASTRA.
-- Foreground service using the Android 14+ `specialUse` type and manifest subtype explanation.
-- Persistent low-priority notification with open-app and Stop action.
-- Floating orb overlay using `TYPE_APPLICATION_OVERLAY` (with legacy window type fallback on API 24–25).
-- Tap-to-expand compact panel, drag-to-move, minimize-to-orb, open ASTRA and stop controls.
-- Optional Android 13+ notification permission request, separate from overlay approval.
-- Settings controls to grant/manage overlay permission and start/stop the orb.
+- User-granted overlay permission.
+- Foreground service and persistent notification.
+- Movable orb, expanded panel, open/minimize/stop controls.
+- Orb glow/window bounds corrected after owner reported clipping.
 
-The overlay is deliberately independent from the mock assistant. It does not inspect other applications, capture the screen, use the microphone, execute commands or perform device actions.
+## Phase 3 — Safe task engine
 
-### CI verification
+**IMPLEMENTED · CI BUILD SUCCESSFUL · UNIT TESTS PASSED**
 
-- **Commit:** `6aecff3959022848456f5c25de5ec9840b6b9b6a`
-- **Workflow:** [Android CI — run 43398815358](https://github.com/spider-man4u/Astra/actions/runs/43398815358)
-- **Build task:** `:app:assembleDebug` — successful
-- **Artifact:** `astra-debug-apk`
-- **Artifact size:** 9,260,371 bytes (about 9.26 MB)
-- **Artifact ID:** `14024515502`
+- WorkManager-backed task execution.
+- DataStore-backed task history and private notes.
+- Allowlisted read-only system status and confirmed private-note save.
+- Explicit confirmation, cancellation, 15-second execution timeout and failure reporting.
+- Unsupported commands rejected; arbitrary shell input is never executed.
 
-CI confirms compilation and packaging only. The floating service must still be tested on the Redmi Pad Pro for permission behaviour, display positioning, dragging, expand/minimize, notification Stop action and service shutdown.
+## Phase 4 — Voice interface
 
-## Phase 3 — Next milestone
+**IMPLEMENTED · CURRENT CI RUN VERIFYING · DEVICE VOICE TEST PENDING**
 
-- Background task orchestration and state persistence.
-- Safe action registry with allowlisted operations.
-- Explicit confirmation for sensitive actions.
-- Robust cancellation, timeout and error reporting.
+- Tap-to-talk control on Chat.
+- Runtime `RECORD_AUDIO` permission requested only when the microphone is tapped.
+- Partial transcript preview and final recognizer result.
+- On-device recognition is preferred where Android reports it available; configured system recognizer is fallback.
+- English (India) and Hindi (India) language preference persisted in DataStore.
+- Optional automatic spoken replies and per-message speaker controls.
+- Listening is cancelled when the app backgrounds; TextToSpeech and SpeechRecognizer resources are released when Chat closes.
+- No background microphone service, wake word or audio recording archive.
 
-## Phase 4–6 — Future scope
+### Phase 4 test checklist on Redmi Pad Pro
 
-- Phase 4: speech recognition and text-to-speech.
-- Phase 5: authenticated local connection to the existing Termux Python backend.
-- Phase 6: allowlisted Android device integrations and permission gates.
+1. Open Chat and tap the microphone; confirm Android shows the microphone permission prompt.
+2. Grant permission and say a short English command such as “status”.
+3. Select Hindi (India) in Settings and test a short Hindi command.
+4. Confirm the recognized text creates the expected task.
+5. Enable “Speak assistant replies” and verify ASTRA reads its reply aloud.
+6. Tap the speaker control on an ASTRA message to replay it.
+7. Switch to another app while listening; confirm listening stops and no late command is submitted.
 
-## Project safety notes
+## Phase 5 — Next milestone
 
-- Do not overwrite the existing Termux backend while working on this Android app.
+- Authenticated connection from Android app to the existing Termux Python backend.
+- Localhost bridge lifecycle, health checks, request IDs, timeouts and clear offline status.
+- Keep provider API keys in Termux, not in the APK.
+- Continue routing future device actions through the task allowlist and explicit approval.
+
+## Security rules
+
+- Do not overwrite the Termux backend during Android app development.
 - Do not hardcode provider credentials in source or APK.
-- Do not claim that mock commands performed real actions.
-- Do not execute arbitrary shell commands or perform sensitive actions without explicit user approval.
+- Never interpret raw user text as shell commands.
+- Do not claim queued work has completed before the task store reports completion.
+- Microphone capture must remain user-initiated and visible.
