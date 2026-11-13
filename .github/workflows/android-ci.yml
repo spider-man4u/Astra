@@ -8,8 +8,6 @@ on:
 
 jobs:
   build:
-    # GitHub-hosted runners have Gradle, the Android SDK, and JDK pre-installed,
-    # so the Gradle-download blocker from the phone environment does not apply here.
     runs-on: ubuntu-latest
 
     steps:
@@ -22,30 +20,37 @@ jobs:
           distribution: 'zulu'
           java-version: '21'
 
+      - name: Install Android SDK command-line tools
+        run: |
+          mkdir -p $ANDROID_HOME/cmdline-tools
+          cd $ANDROID_HOME/cmdline-tools
+          curl -sL -o cmdline-tools.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+          unzip -q -o cmdline-tools.zip -d . && mv cmdline-tools latest && rm cmdline-tools.zip
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --sdk_root=$ANDROID_HOME "platform-tools" "build-tools;35.0.0" "platforms;android-35" >/dev/null 2>&1
+
+      - name: Install Gradle 8.14
+        run: |
+          cd /tmp
+          curl -sL -o gradle.zip https://gradle.org/distributions/gradle-8.14-bin.zip
+          unzip -q -o gradle.zip -d /opt
+          echo "GRADLE_HOME=/opt/gradle-8.14" >> $GITHUB_ENV
+          echo "/opt/gradle-8.14/bin" >> $GITHUB_PATH
+
       - name: Cache Gradle packages
         uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - name: Cache Android SDK
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.android/build-cache
-            ~/.gradle/caches/modules-2
-          key: ${{ runner.os }}-android-${{ hashFiles('**/*.gradle*') }}
-
-      - name: Make Gradle wrapper executable
-        run: chmod +x gradlew
-
       - name: Assemble Debug APK
-        # Gradle wrapper downloads Gradle 8.14 automatically on the runner.
-        run: ./gradlew :app:assembleDebug
+        run: |
+          export ANDROID_HOME=${ANDROID_HOME:-/usr/lib/android-sdk}
+          export JAVA_HOME=${JAVA_HOME:-/usr/lib/jvm/zulu-21}
+          export PATH=/opt/gradle-8.14/bin:$PATH
+          gradle :app:assembleDebug
 
       - name: Upload debug APK as artifact
         uses: actions/upload-artifact@v4
