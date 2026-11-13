@@ -9,70 +9,65 @@
 
 **Status: COMPLETE**
 
-The initial coding environment was inspected and the required JDK, Android SDK command-line tools, API 35 platform, Build Tools 35.0.0 and Gradle 8.x toolchain were prepared in the OpenCode Mobile workspace.
-
-The Termux Python backend is a separate environment and was not modified by Phase 1.
+The initial coding environment was inspected and the required JDK, Android SDK command-line tools, API 35 platform, Build Tools 35.0.0 and Gradle 8.x toolchain were prepared in the OpenCode Mobile workspace. The Termux Python backend is separate and has not been modified.
 
 ## Phase 1 — Application foundation
 
-**Status: IMPLEMENTED · CI BUILD SUCCESSFUL · DEVICE TEST PENDING**
+**Status: IMPLEMENTED · CI BUILD SUCCESSFUL · DEVICE VISUAL TEST COMPLETED BY OWNER**
 
-### Delivered
-
+Delivered:
 - Android app module, manifest, theme resources and launcher icon.
-- Kotlin 1.9.24, AGP 8.5.0, Gradle 8.7 wrapper distribution and Compose Compiler 1.5.14.
-- Jetpack Compose Material 3 theme with System / Dark / Light selection.
-- Main activity and Dashboard / Chat / Settings navigation.
-- Animated cyan ASTRA orb with state-aware colors and pulse animation.
-- Dashboard command console, quick prompts and recent task panel.
-- Assistant repository interface with a local mock implementation.
-- Reactive StateFlows for assistant state, messages and tasks.
-- Mock command lifecycle: Thinking → Planning → Executing → Completed.
-- Chat screen with live conversation history and send control.
-- DataStore-backed display name, theme mode and voice preference.
-- Clear UI disclosure that the current assistant is mock-only and does not execute device actions.
+- Kotlin 1.9.24, AGP 8.5.0, Gradle 8.7 and Compose Compiler 1.5.14.
+- Holographic dashboard, animated orb, command dock and quick-access tiles.
+- Reactive mock conversation, task state and recent activity.
+- Dashboard / Chat / Settings navigation.
+- DataStore-backed display name, appearance mode and voice preference.
+
+The owner installed the Phase 1 build and provided dashboard / settings screenshots. This feedback prompted the holographic redesign.
+
+## Phase 2 — Floating interface
+
+**Status: IMPLEMENTED · CI BUILD SUCCESSFUL · REDMI PAD PRO RUNTIME TEST PENDING**
+
+Delivered:
+- `SYSTEM_ALERT_WINDOW` permission declaration and explicit Settings hand-off.
+- Permission status refresh when returning to ASTRA.
+- Foreground service using the Android 14+ `specialUse` type and manifest subtype explanation.
+- Persistent low-priority notification with open-app and Stop action.
+- Floating orb overlay using `TYPE_APPLICATION_OVERLAY` (with legacy window type fallback on API 24–25).
+- Tap-to-expand compact panel, drag-to-move, minimize-to-orb, open ASTRA and stop controls.
+- Optional Android 13+ notification permission request, separate from overlay approval.
+- Settings controls to grant/manage overlay permission and start/stop the orb.
+
+The overlay is deliberately independent from the mock assistant. It does not inspect other applications, capture the screen, use the microphone, execute commands or perform device actions.
 
 ### CI verification
 
-- **Commit:** `c74c47afc1671a5ba7ba9e4dad1cce6471a2ede0`
-- **Workflow:** [Android CI — run 43386004013](https://github.com/spider-man4u/Astra/actions/runs/43386004013)
+- **Commit:** `6aecff3959022848456f5c25de5ec9840b6b9b6a`
+- **Workflow:** [Android CI — run 43398815358](https://github.com/spider-man4u/Astra/actions/runs/43398815358)
 - **Build task:** `:app:assembleDebug` — successful
 - **Artifact:** `astra-debug-apk`
-- **Artifact size:** 9,188,980 bytes (about 9.19 MB)
-- **Artifact retention:** 30 days
+- **Artifact size:** 9,260,371 bytes (about 9.26 MB)
+- **Artifact ID:** `14024515502`
 
-The Compose compiler mismatch was fixed by changing the compiler extension from 1.5.12 to 1.5.14, which is compatible with Kotlin 1.9.24.
+CI confirms compilation and packaging only. The floating service must still be tested on the Redmi Pad Pro for permission behaviour, display positioning, dragging, expand/minimize, notification Stop action and service shutdown.
 
-### Remaining Phase 1 acceptance check
+## Phase 3 — Next milestone
 
-CI verifies compilation and APK packaging only. The APK still needs to be installed and smoke-tested on the Redmi Pad Pro:
+- Background task orchestration and state persistence.
+- Safe action registry with allowlisted operations.
+- Explicit confirmation for sensitive actions.
+- Robust cancellation, timeout and error reporting.
 
-1. App launches and dashboard renders.
-2. Orb animates and changes color while the mock assistant processes a command.
-3. Quick prompts create a task and add user / assistant messages.
-4. Chat screen displays the same conversation history.
-5. Display name and theme preference survive app restarts.
-6. App handles portrait / landscape and tablet-sized layout acceptably.
+## Phase 4–6 — Future scope
 
-## Phase 2 — Next milestone
-
-Planned only; not implemented in this build:
-
-- Floating bubble and overlay permission rationale.
-- Foreground service with proper Android lifecycle handling.
-- Explicit permission flow and return-to-app handling.
-- No automatic overlay launch or hidden permissions.
-
-## Phase 3–6 — Future scope
-
-- Phase 3: background task orchestration and safe action execution.
 - Phase 4: speech recognition and text-to-speech.
 - Phase 5: authenticated local connection to the existing Termux Python backend.
-- Phase 6: allowlisted Android device integrations with explicit confirmation for sensitive actions.
+- Phase 6: allowlisted Android device integrations and permission gates.
 
 ## Project safety notes
 
 - Do not overwrite the existing Termux backend while working on this Android app.
-- Do not hardcode Gemini / Groq / other provider credentials in source or APK.
+- Do not hardcode provider credentials in source or APK.
 - Do not claim that mock commands performed real actions.
 - Do not execute arbitrary shell commands or perform sensitive actions without explicit user approval.

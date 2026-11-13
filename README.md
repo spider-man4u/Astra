@@ -4,35 +4,45 @@
 **Platform:** Native Android (tablet-first)  
 **Primary device:** Redmi Pad Pro 5G · Android 16 · 8 GB RAM
 
-ASTRA is a personal Android assistant concept inspired by JARVIS / FRIDAY / EDITH. The planned experience is a persistent floating orb with conversational AI and carefully permissioned device actions.
+ASTRA is a personal Android assistant concept inspired by JARVIS / FRIDAY / EDITH. Its planned experience is a floating orb, conversational AI and carefully permissioned device actions.
 
-## Current milestone: Phase 1 — Application Foundation
+## Current milestone status
 
-<details>
-<summary>Phase 1 delivery status</summary>
+### Phase 1 — Application foundation
 
-- [x] Android Gradle project and CI build pipeline
-- [x] Compose app theme and animated, state-aware orb
-- [x] Dashboard with command input and working quick prompts
-- [x] Reactive mock conversation and message history
-- [x] Task lifecycle and recent-activity panel
-- [x] Dashboard / Chat / Settings navigation
-- [x] DataStore preferences for display name, theme mode and voice preference
-- [x] Debug APK built and uploaded by GitHub Actions
-- [ ] Install on the Redmi Pad Pro and complete on-device visual / interaction smoke test
+**Implemented and CI build verified.** Includes the holographic Compose dashboard, animated orb, quick prompts, reactive mock chat, task history and DataStore-backed user preferences.
 
-**Important:** CI proves the source compiles and packages. It does not prove the APK has been installed or visually tested on the target tablet yet.
+### Phase 2 — Floating interface
 
-</details>
+**Implemented and CI build verified · target-device testing pending.**
 
-### What works in this build
+- User-triggered overlay permission flow from Settings.
+- Floating orb hosted by a foreground service.
+- Tap the orb to expand the compact control panel.
+- Drag the orb or expanded panel to reposition it.
+- Open ASTRA from the panel, minimize back to the orb, or stop the service.
+- Persistent low-priority foreground notification with a Stop action.
+- Overlay access can be managed or revoked by the user in Android Settings.
 
-- **Dashboard:** animated orb, current assistant state, command console, quick prompts and recent activity.
-- **Chat:** reactive message history, send controls, busy state and clear mock-mode disclosure.
-- **Settings:** saved display name, System / Dark / Light theme selection, and a saved voice preference flag.
+The service is an interface shell only. It does not read other apps, capture the screen, use the microphone, execute shell commands, or perform device actions. The assistant backend remains mock-only.
+
+## Permissions and Android behaviour
+
+ASTRA requests `SYSTEM_ALERT_WINDOW` because Android requires explicit user approval before an app can display a `TYPE_APPLICATION_OVERLAY` window. The floating service starts only from an explicit action while the app is visible.
+
+On Android 14 and later, the service declares the `specialUse` foreground-service type and explains its floating-interface use in the manifest. This is a system declaration, not a Play Store approval. A store release would still need the applicable foreground-service policy review.
+
+Android 13+ notification permission is requested separately. It is optional for starting the foreground service; denying it does not grant overlay access and does not block the user-enabled orb.
+
+## What works in the current build
+
+- **Dashboard:** holographic orb, state indicator, command dock, quick-access tiles and recent activity.
+- **Chat:** live message history, send controls and clear mock-mode disclosure.
+- **Settings:** display name, System / Dark / Light appearance, voice preference, overlay permission and floating-orb controls.
+- **Floating interface:** movable orb, expanded mini panel, open-app / minimize / stop controls.
 - **Mock assistant:** simulates Thinking → Planning → Executing → Completed and records a task.
 
-All assistant replies in Phase 1 come from `MockAssistantRepository`. No real AI provider is connected and no device action is executed. The voice preference is stored only; microphone and speech features are not implemented yet.
+No real AI provider is connected. Voice preference is stored only; speech recognition and speech output are not implemented yet.
 
 ## Build configuration
 
@@ -47,40 +57,20 @@ All assistant replies in Phase 1 come from `MockAssistantRepository`. No real AI
 | minSdk | 24 |
 | JDK in CI | 21 |
 
-The CI workflow generates the missing Gradle wrapper JAR on the GitHub-hosted runner, validates it, builds the debug APK and uploads the artifact.
+GitHub Actions generates the Gradle wrapper JAR on the hosted runner, validates it, builds the debug APK and uploads the artifact for 30 days.
 
 ## Download the debug APK
 
-1. Open the [latest Android CI run](https://github.com/spider-man4u/Astra/actions/workflows/android-ci.yml).
-2. Open the newest successful run on `master`.
+1. Open [Android CI runs](https://github.com/spider-man4u/Astra/actions/workflows/android-ci.yml).
+2. Open the latest successful run on `master`.
 3. In **Artifacts**, download `astra-debug-apk`.
-4. Extract the ZIP and install `app-debug.apk` on the tablet.
+4. Extract and install `app-debug.apk` on the tablet.
 
-Artifacts are retained for 30 days.
-
-## Local build
-
-Requirements: JDK 17 or 21, Android SDK platform 35, Build Tools 35.0.0, and Gradle 8.7.
-
-This repository currently generates `gradle-wrapper.jar` in CI rather than committing the binary. On a machine with Gradle 8.7 installed, run:
-
-```bash
-gradle :wrapper --gradle-version 8.7 --distribution-type bin
-./gradlew :app:assembleDebug
-```
-
-APK output:
-
-```
-app/build/outputs/apk/debug/app-debug.apk
-```
-
-## Planned phases
+## Planned next phases
 
 | Phase | Scope |
 |---|---|
-| 2 | Floating bubble, overlay permission flow and foreground service |
-| 3 | Background task handling and safe action execution |
+| 3 | Background task orchestration and safe action execution |
 | 4 | Speech recognition and text-to-speech |
 | 5 | Secure connection to the existing Python backend in Termux |
 | 6 | Device integrations, permission gates and allowlisted actions |

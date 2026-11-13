@@ -56,7 +56,7 @@ fun SettingsScreen(navController: NavHostController, settings: AstraSettings) {
         // Notification permission is optional for starting an FGS. Android may
         // still show the service in its active-app/task-manager surfaces.
         AstraOverlayService.start(context)
-        serviceRunning = AstraOverlayService.isRunning
+        serviceRunning = true
         scope.launch {
             snackbarHostState.showSnackbar(
                 if (it) "Floating orb started" else "Orb started; notification drawer alerts are disabled"
@@ -83,7 +83,7 @@ fun SettingsScreen(navController: NavHostController, settings: AstraSettings) {
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         } else {
             AstraOverlayService.start(context)
-            serviceRunning = AstraOverlayService.isRunning
+            serviceRunning = true
             scope.launch { snackbarHostState.showSnackbar("Floating orb started") }
         }
     }
