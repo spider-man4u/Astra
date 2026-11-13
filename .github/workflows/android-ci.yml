@@ -20,37 +20,17 @@ jobs:
           distribution: 'zulu'
           java-version: '21'
 
-      - name: Install Android SDK command-line tools
+      - name: Show build tool versions
         run: |
-          mkdir -p $ANDROID_HOME/cmdline-tools
-          cd $ANDROID_HOME/cmdline-tools
-          curl -sL -o cmdline-tools.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
-          unzip -q -o cmdline-tools.zip -d . && mv cmdline-tools latest && rm cmdline-tools.zip
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --sdk_root=$ANDROID_HOME "platform-tools" "build-tools;35.0.0" "platforms;android-35" >/dev/null 2>&1
-
-      - name: Install Gradle 8.14
-        run: |
-          cd /tmp
-          curl -sL -o gradle.zip https://gradle.org/distributions/gradle-8.14-bin.zip
-          unzip -q -o gradle.zip -d /opt
-          echo "GRADLE_HOME=/opt/gradle-8.14" >> $GITHUB_ENV
-          echo "/opt/gradle-8.14/bin" >> $GITHUB_PATH
-
-      - name: Cache Gradle packages
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          java -version 2>&1
+          gradle --version 2>&1 | head -5
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          ls "$ANDROID_HOME/platform-tools/adb" 2>&1
+          ls "$ANDROID_HOME/build-tools" 2>&1
 
       - name: Assemble Debug APK
-        run: |
-          export ANDROID_HOME=${ANDROID_HOME:-/usr/lib/android-sdk}
-          export JAVA_HOME=${JAVA_HOME:-/usr/lib/jvm/zulu-21}
-          export PATH=/opt/gradle-8.14/bin:$PATH
-          gradle :app:assembleDebug
+        run: gradle :app:assembleDebug
 
       - name: Upload debug APK as artifact
         uses: actions/upload-artifact@v4
