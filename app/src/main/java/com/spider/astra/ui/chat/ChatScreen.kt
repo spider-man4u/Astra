@@ -1,5 +1,9 @@
 package com.spider.astra.ui.chat
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -17,32 +21,86 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavHostController
 import com.spider.astra.assistant.core.AssistantRepository
 import com.spider.astra.assistant.core.AssistantState
 import com.spider.astra.assistant.models.AssistantMessage
 import com.spider.astra.assistant.state.TaskStatus
+import com.spider.astra.data.settings.AstraSettings
 import com.spider.astra.ui.components.TaskActionCard
 import com.spider.astra.ui.theme.AstraPalette
+import com.spider.astra.voice.AstraVoiceController
 import kotlinx.coroutines.launch
 
 @Composable
-fun ChatScreen(navController: NavHostController, repository: AssistantRepository) {
+fun ChatScreen(
+    navController: NavHostController,
+    repository: AssistantRepository,
+    settings: AstraSettings
+) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val state by repository.stateFlow.collectAsState()
     val messages by repository.messagesFlow.collectAsState()
     val tasks by repository.tasksFlow.collectAsState()
+    val voiceResponsesEnabled by settings.voiceEnabled.collectAsState(initial = false)
+    val voiceLanguage by settings.voiceLanguage.collectAsState(initial = "en-IN")
     var command by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
+    val voiceController = remember(context) { AstraVoiceController(context) }
+    val voiceState by voiceController.state.collectAsState()
+
     val isBusy = state == AssistantState.THINKING ||
         state == AssistantState.PLANNING || state == AssistantState.EXECUTING
     val pendingApprovals = tasks.filter { it.status == TaskStatus.AWAITING_CONFIRMATION }
 
+    val microphonePermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            voiceController.startListening(voiceLanguage)
+        } else {
+            voiceController.reportError("Microphone access was denied. Enable it in Android Settings to use voice input.")
+        }
+    }
+
+    DisposableEffect(lifecycleOwner, voiceController) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) {
+                voiceController.stopListening()
+                voiceController.stopSpeaking()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            voiceController.release()
+        }
+    }
+
+    LaunchedEffect(voiceState.transcript) {
+        val recognised = voiceState.transcript?.trim()
+        if (!recognised.isNullOrBlank()) {
+            voiceController.clearTranscript()
+            val response = repository.sendCommand(recognised)
+            if (voiceResponsesEnabled && response.message.isNotBlank()) {
+                voiceController.speak(response.message, voiceLanguage)
+            }
+        }
+    }
+
     LaunchedEffect(messages.size, pendingApprovals.size) {
-        val total = messages.size + pendingApprovals.size + if (pendingApprovals.isNotEmpty()) 1 else 0
+        val total = messages.size + pendingApprovals.size +
+            if (pendingApprovals.isNotEmpty()) 1 else 0
         if (total > 0) listState.animateScrollToItem(total - 1)
     }
 
@@ -50,7 +108,28 @@ fun ChatScreen(navController: NavHostController, repository: AssistantRepository
         val clean = command.trim()
         if (clean.isNotEmpty() && !isBusy) {
             command = ""
-            scope.launch { repository.sendCommand(clean) }
+            scope.launch {
+                val response = repository.sendCommand(clean)
+                if (voiceResponsesEnabled && response.message.isNotBlank()) {
+                    voiceController.speak(response.message, voiceLanguage)
+                }
+            }
+        }
+    }
+
+    fun toggleMicrophone() {
+        if (voiceState.isListening) {
+            voiceController.stopListening()
+            return
+        }
+
+        voiceController.clearError()
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            voiceController.startListening(voiceLanguage)
+        } else {
+            microphonePermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
 
@@ -58,7 +137,8 @@ fun ChatScreen(navController: NavHostController, repository: AssistantRepository
         containerColor = AstraPalette.Background,
         topBar = {
             Row(
-                modifier = Modifier.fillMaxWidth().background(AstraPalette.Background).padding(horizontal = 16.dp, vertical = 10.dp),
+                modifier = Modifier.fillMaxWidth().background(AstraPalette.Background)
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
@@ -79,9 +159,14 @@ fun ChatScreen(navController: NavHostController, repository: AssistantRepository
                     border = androidx.compose.foundation.BorderStroke(1.dp, AstraPalette.Border)
                 ) {
                     Row(Modifier.padding(horizontal = 10.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(6.dp).background(if (isBusy) AstraPalette.Violet else AstraPalette.Green, CircleShape))
+                        Box(Modifier.size(6.dp).background(if (voiceState.isListening) AstraPalette.Amber else AstraPalette.Green, CircleShape))
                         Spacer(Modifier.width(7.dp))
-                        Text(if (isBusy) state.name else "LOCAL", color = AstraPalette.Muted, fontSize = 9.sp, letterSpacing = 1.sp)
+                        Text(
+                            if (voiceState.isListening) "LISTENING" else if (voiceState.isSpeaking) "SPEAKING" else "LOCAL",
+                            color = AstraPalette.Muted,
+                            fontSize = 9.sp,
+                            letterSpacing = 1.sp
+                        )
                     }
                 }
             }
@@ -89,7 +174,8 @@ fun ChatScreen(navController: NavHostController, repository: AssistantRepository
         bottomBar = {
             Surface(color = AstraPalette.Panel, tonalElevation = 0.dp) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(horizontal = 12.dp, vertical = 10.dp),
+                    modifier = Modifier.fillMaxWidth().navigationBarsPadding().imePadding()
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     OutlinedTextField(
@@ -98,7 +184,7 @@ fun ChatScreen(navController: NavHostController, repository: AssistantRepository
                         modifier = Modifier.weight(1f),
                         placeholder = { Text("Try status, help or note: …", color = AstraPalette.Dim) },
                         singleLine = true,
-                        enabled = !isBusy,
+                        enabled = !isBusy && !voiceState.isListening,
                         shape = RoundedCornerShape(18.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = AstraPalette.Cyan,
@@ -108,11 +194,24 @@ fun ChatScreen(navController: NavHostController, repository: AssistantRepository
                             cursorColor = AstraPalette.Cyan
                         )
                     )
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(5.dp))
+                    IconButton(
+                        onClick = { toggleMicrophone() },
+                        enabled = voiceState.recognitionAvailable,
+                        modifier = Modifier.size(46.dp).clip(CircleShape)
+                            .background(if (voiceState.isListening) AstraPalette.Amber else AstraPalette.PanelRaised)
+                    ) {
+                        Text(
+                            if (voiceState.isListening) "■" else "🎙",
+                            color = if (voiceState.isListening) AstraPalette.BackgroundDeep else AstraPalette.Cyan,
+                            fontSize = 19.sp
+                        )
+                    }
+                    Spacer(Modifier.width(5.dp))
                     IconButton(
                         onClick = { send() },
-                        enabled = command.isNotBlank() && !isBusy,
-                        modifier = Modifier.size(48.dp).clip(CircleShape)
+                        enabled = command.isNotBlank() && !isBusy && !voiceState.isListening,
+                        modifier = Modifier.size(46.dp).clip(CircleShape)
                             .background(if (command.isNotBlank() && !isBusy) AstraPalette.CyanBright else AstraPalette.PanelRaised)
                     ) {
                         Icon(
@@ -132,14 +231,29 @@ fun ChatScreen(navController: NavHostController, repository: AssistantRepository
                 shape = RoundedCornerShape(14.dp),
                 border = androidx.compose.foundation.BorderStroke(1.dp, AstraPalette.Border)
             ) {
-                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("✦", color = AstraPalette.Cyan, fontSize = 16.sp)
-                    Spacer(Modifier.width(10.dp))
-                    Text(
-                        "WorkManager queue · Allowlisted actions only · Notes need confirmation",
-                        color = AstraPalette.Muted,
-                        fontSize = 10.sp
-                    )
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("✦", color = AstraPalette.Cyan, fontSize = 16.sp)
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            "Tap-to-talk · " + voiceLanguage + " · No background listening",
+                            color = AstraPalette.Muted,
+                            fontSize = 10.sp
+                        )
+                    }
+                    if (voiceState.isListening || voiceState.partialTranscript.isNotBlank()) {
+                        Text(
+                            voiceState.partialTranscript.ifBlank { "Listening… speak now" },
+                            color = AstraPalette.Cyan,
+                            fontSize = 11.sp
+                        )
+                    } else if (voiceState.isSpeaking) {
+                        Text("ASTRA is speaking your reply…", color = AstraPalette.Violet, fontSize = 10.sp)
+                    } else if (voiceState.errorMessage != null) {
+                        Text(voiceState.errorMessage.orEmpty(), color = AstraPalette.Amber, fontSize = 10.sp)
+                    } else if (voiceResponsesEnabled && !voiceState.ttsReady) {
+                        Text("Preparing speech engine…", color = AstraPalette.Dim, fontSize = 10.sp)
+                    }
                 }
             }
 
@@ -167,14 +281,21 @@ fun ChatScreen(navController: NavHostController, repository: AssistantRepository
                         )
                     }
                 }
-                items(messages, key = { it.id }) { message -> MessageBubble(message) }
+                items(messages, key = { it.id }) { message ->
+                    MessageBubble(
+                        message = message,
+                        onSpeak = if (message.direction == AssistantMessage.Direction.ASSISTANT) {
+                            { voiceController.speak(message.text, voiceLanguage) }
+                        } else null
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun MessageBubble(message: AssistantMessage) {
+private fun MessageBubble(message: AssistantMessage, onSpeak: (() -> Unit)?) {
     val isUser = message.direction == AssistantMessage.Direction.USER
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -195,14 +316,21 @@ private fun MessageBubble(message: AssistantMessage) {
             )
         ) {
             Column(Modifier.padding(horizontal = 15.dp, vertical = 12.dp)) {
-                Text(
-                    if (isUser) "YOU" else "ASTRA CORE",
-                    color = if (isUser) AstraPalette.Cyan else AstraPalette.Violet,
-                    fontSize = 9.sp,
-                    letterSpacing = 1.5.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(Modifier.height(5.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        if (isUser) "YOU" else "ASTRA CORE",
+                        modifier = Modifier.weight(1f),
+                        color = if (isUser) AstraPalette.Cyan else AstraPalette.Violet,
+                        fontSize = 9.sp,
+                        letterSpacing = 1.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (onSpeak != null) {
+                        TextButton(onClick = onSpeak, contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)) {
+                            Text("🔊", fontSize = 14.sp)
+                        }
+                    }
+                }
                 Text(message.text, color = AstraPalette.Text, fontSize = 13.sp, lineHeight = 19.sp)
                 if (message.state == AssistantMessage.AssistantMessageState.FAILED) {
                     Spacer(Modifier.height(4.dp))

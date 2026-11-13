@@ -43,6 +43,7 @@ fun SettingsScreen(navController: NavHostController, settings: AstraSettings) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val storedName by settings.userName.collectAsState(initial = null)
     val voiceEnabled by settings.voiceEnabled.collectAsState(initial = false)
+    val voiceLanguage by settings.voiceLanguage.collectAsState(initial = "en-IN")
     val themeMode by settings.themeMode.collectAsState(initial = "system")
     var nameInput by remember { mutableStateOf("Spider") }
     var overlayGranted by remember { mutableStateOf(AndroidSettings.canDrawOverlays(context)) }
@@ -272,11 +273,11 @@ fun SettingsScreen(navController: NavHostController, settings: AstraSettings) {
                     Text("System follows your Android appearance setting.", color = AstraPalette.Dim, fontSize = 10.sp)
                 }
 
-                SettingsPanel(title = "VOICE INTERFACE", subtitle = "Preference only · Voice arrives in Phase 4") {
+                SettingsPanel(title = "VOICE INTERFACE", subtitle = "Tap-to-talk input and spoken replies") {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("Voice responses", color = AstraPalette.Text, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                            Text("Save your preference for the future voice engine.", color = AstraPalette.Muted, fontSize = 11.sp)
+                            Text("Speak assistant replies", color = AstraPalette.Text, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                            Text("Automatically read replies after a voice command. You can also tap the speaker on any ASTRA message.", color = AstraPalette.Muted, fontSize = 11.sp, lineHeight = 16.sp)
                         }
                         Switch(
                             checked = voiceEnabled,
@@ -289,6 +290,21 @@ fun SettingsScreen(navController: NavHostController, settings: AstraSettings) {
                             )
                         )
                     }
+                    Text("VOICE INPUT LANGUAGE", color = AstraPalette.Muted, fontSize = 9.sp, letterSpacing = 1.4.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        ThemeChoice("ENGLISH · IN", voiceLanguage == "en-IN", Modifier.weight(1f)) {
+                            scope.launch { settings.setVoiceLanguage("en-IN") }
+                        }
+                        ThemeChoice("HINDI · IN", voiceLanguage == "hi-IN", Modifier.weight(1f)) {
+                            scope.launch { settings.setVoiceLanguage("hi-IN") }
+                        }
+                    }
+                    Text(
+                        "Microphone access is requested only when you tap the mic in Chat. ASTRA does not listen in the background.",
+                        color = AstraPalette.Dim,
+                        fontSize = 10.sp,
+                        lineHeight = 15.sp
+                    )
                 }
 
                 SettingsPanel(title = "RUNTIME", subtitle = "Current assistant environment") {
@@ -298,7 +314,7 @@ fun SettingsScreen(navController: NavHostController, settings: AstraSettings) {
                         Text("LOCAL SIMULATION", color = AstraPalette.Amber, fontSize = 10.sp, letterSpacing = 1.3.sp, fontWeight = FontWeight.Bold)
                     }
                     Text(
-                        "This build simulates command processing. No AI provider, Termux backend, microphone or device-control service is connected. The floating orb is a separate interface only.",
+                        "ASTRA uses a local allowlisted task engine. No remote AI provider or Termux backend is connected. Voice input and speech output use Android speech services.",
                         color = AstraPalette.Muted,
                         fontSize = 11.sp,
                         lineHeight = 17.sp
@@ -307,13 +323,13 @@ fun SettingsScreen(navController: NavHostController, settings: AstraSettings) {
 
                 SettingsPanel(title = "ROADMAP", subtitle = "What comes after the foundation") {
                     RoadmapLine("02", "Floating orb", "Overlay and permission flow", true)
-                    RoadmapLine("03", "Background tasks", "Foreground service and task handling", false)
-                    RoadmapLine("04", "Voice interface", "Speech recognition and spoken responses", false)
+                    RoadmapLine("03", "Background tasks", "Foreground service and task handling", true)
+                    RoadmapLine("04", "Voice interface", "Tap-to-talk and spoken responses", true)
                     RoadmapLine("05", "Core intelligence", "Secure connection to your Termux backend", false)
                 }
 
                 Text(
-                    "ASTRA  /  PERSONAL INTELLIGENCE  /  BUILD 02",
+                    "ASTRA  /  PERSONAL INTELLIGENCE  /  BUILD 04",
                     modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                     color = AstraPalette.Dim,
                     fontSize = 9.sp,
