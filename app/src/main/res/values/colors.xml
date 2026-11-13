@@ -27,5 +27,6 @@
 
     <!-- Misc -->
     <color name="astra_divider">#1E293B</color>
-    <color name="astra_glass">rgba(16, 28, 48, 0.6)</color>
+    <!-- 60% alpha glass surface; Android XML colors require hex, not CSS rgba(). -->
+    <color name="astra_glass">#99101C30</color>
 </resources>
